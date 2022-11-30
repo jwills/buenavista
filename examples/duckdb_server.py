@@ -30,6 +30,26 @@ class DuckDBAdapter(Adapter):
             return "SELECT 'read committed' as transaction_isolation"
         return sql
 
+    def execute_sql(
+        self, cursor, sql: str, params=None, limit: int = -1
+    ) -> QueryResult:
+        print("Original SQL:", sql)
+        sql = self.rewrite_sql(sql)
+        print("Rewritten SQL:", sql)
+        if params:
+            cursor.execute(sql, params)
+        else:
+            cursor.execute(sql)
+
+        rows = []
+        if cursor.description:
+            if limit == -1:
+                rows = cursor.fetchall()
+            else:
+                rows = cursor.fetchmany(limit)
+
+        return self.to_query_result(cursor.description, rows)
+
     def to_query_result(self, description, rows) -> QueryResult:
         fields = []
         for i, d in enumerate(description):
@@ -85,13 +105,13 @@ if __name__ == "__main__":
 
     # some tables/view definitions we need for DBeaver
     db.execute(
-        "CREATE TABLE IF NOT EXISTS pg_catalog.pg_database AS SELECT 12345 as oid, 'main' as datname"
+        "CREATE OR REPLACE VIEW pg_catalog.pg_database AS SELECT 0 oid, 'main' datname"
     )
     db.execute(
-        "CREATE TABLE IF NOT EXISTS pg_catalog.pg_proc (oid INTEGER, proname TEXT, pronamespace TEXT)"
+        "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
     )
     db.execute(
-        "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT * FROM duckdb_settings()"
+        "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT name, value setting, description short_desc, CASE WHEN input_type = 'VARCHAR' THEN 'string' WHEN input_type = 'BOOLEAN' THEN 'bool' WHEN input_type IN ('BIGINT', 'UBIGINT') THEN 'integer' ELSE input_type END vartype FROM duckdb_settings()"
     )
 
     address = ("localhost", 5433)

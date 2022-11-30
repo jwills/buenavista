@@ -66,23 +66,8 @@ class AdapterHandle:
     def close(self):
         self.cursor.close()
 
-    def execute_sql(self, sql: str, params=None, limit: int = 0) -> QueryResult:
-        print("Original SQL:", sql)
-        sql = self.parent.rewrite_sql(sql)
-        print("Rewritten SQL:", sql)
-        if params:
-            self.cursor.execute(sql, params)
-        else:
-            self.cursor.execute(sql)
-
-        rows = []
-        if self.cursor.description:
-            if limit == 0:
-                rows = self.cursor.fetchall()
-            else:
-                rows = self.cursor.fetchmany(limit)
-
-        return self.parent.to_query_result(self.cursor.description, rows)
+    def execute_sql(self, sql: str, params=None, limit: int = -1) -> QueryResult:
+        return self.parent.execute_sql(self.cursor, sql, params, limit)
 
 
 class Adapter:
@@ -96,7 +81,9 @@ class Adapter:
     def _cursor(self):
         raise NotImplementedError
 
-    def to_query_result(self, description, rows) -> QueryResult:
+    def execute_sql(
+        self, cursor, sql: str, params=None, limit: int = -1
+    ) -> QueryResult:
         raise NotImplementedError
 
     def cancel_query(self, process_id: int, secret_key: int):
@@ -104,6 +91,3 @@ class Adapter:
 
     def parameters(self) -> Dict[str, str]:
         return {}
-
-    def rewrite_sql(self, sql: str) -> str:
-        return sql

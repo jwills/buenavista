@@ -122,12 +122,12 @@ class BVContext:
     def describe_portal(self, name: str) -> List[Field]:
         stmt, params = self.portals[name]
         sql = self.stmts[stmt]
-        query_result = self.handle.execute_sql(sql, params, limit=5)
+        query_result = self.handle.execute_sql(sql, params, limit=0)
         return query_result.fields
 
     def describe_statement(self, name: str) -> List[Field]:
         sql = self.stmts[name]
-        query_result = self.handle.execute_sql(sql, limit=5)
+        query_result = self.handle.execute_sql(sql, limit=0)
         return query_result.fields
 
     def execute_portal(self, name: str, limit: int) -> QueryResult:

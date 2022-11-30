@@ -12,17 +12,27 @@ class Psycopg2Adapter(Adapter):
     def _cursor(self):
         return self.db.cursor()
 
-    def to_query_result(self, description, rows) -> QueryResult:
-        fields = []
-        for field in description:
-            fields.append(Field(field.name, field.type_code))
-        return QueryResult(fields, rows)
-
     def parameters(self) -> Dict[str, str]:
         return {
             "server_version": self.db.get_parameter_status("server_version"),
             "client_encoding": self.db.get_parameter_status("client_encoding"),
         }
+
+    def execute_sql(
+        self, cursor, sql: str, params=None, limit: int = -1
+    ) -> QueryResult:
+        if params:
+            cursor.execute(sql, params)
+        else:
+            cursor.execute(sql)
+
+        rows = []
+        if cursor.description:
+            if limit == -1:
+                rows = cursor.fetchall()
+            else:
+                rows = cursor.fetchmany(limit)
+        return self.to_query_result(cursor.description, rows)
 
     def to_query_result(self, description, rows) -> QueryResult:
         if not description:
