@@ -1,7 +1,7 @@
 import datetime
 import json
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class PGType:
@@ -45,7 +45,7 @@ class QueryResult:
     def column(self, index: int) -> Tuple[str, int]:
         raise NotImplementedError
 
-    def row(self, index: int) -> bytes:
+    def row(self, index: int) -> List[Optional[str]]:
         raise NotImplementedError
 
 

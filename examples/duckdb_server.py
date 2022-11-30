@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 
 import duckdb
 import pyarrow as pa
@@ -8,23 +8,23 @@ from buenavista.adapter import *
 
 
 def oid(t: pa.DataType) -> int:
-    if pa.lib.is_boolean(t):
+    if pa.types.is_boolean(t):
         return BOOL_TYPE.oid
-    elif pa.lib.is_integer(t):
+    elif pa.types.is_integer(t):
         return INTEGER_TYPE.oid
-    elif pa.lib.is_string(t):
+    elif pa.types.is_string(t):
         return TEXT_TYPE.oid
-    elif pa.lib.is_date(t):
+    elif pa.types.is_date(t):
         return DATE_TYPE.oid
-    elif pa.lib.is_time(t):
+    elif pa.types.is_time(t):
         return TIME_TYPE.oid
-    elif pa.lib.is_timestamp(t):
+    elif pa.types.is_timestamp(t):
         return TIMESTAMP_TYPE.oid
-    elif pa.lib.is_float(t):
+    elif pa.types.is_floating(t):
         return FLOAT_TYPE.oid
-    elif pa.lib.is_decimal(t):
+    elif pa.types.is_decimal(t):
         return NUMERIC_TYPE.oid
-    elif pa.lib.is_binary(t):
+    elif pa.types.is_binary(t):
         return BYTES_TYPE.oid
     else:
         return UNKNOWN_TYPE.oid
@@ -44,11 +44,10 @@ class DuckDBQueryResult(QueryResult):
         s = self.tbl.schema[index]
         return s.name, oid(s.type)
 
-    def row(self, index: int) -> bytes:
-        row = self.tbl.slice(offset=index, length=1)
-        buf = BVBuffer()
-        # TODO: fill this block in here
-        return buf.get_value()
+    def row(self, index: int) -> List[Optional[str]]:
+        slice = self.tbl.slice(offset=index, length=1)
+        # TODO: make this richer/faster in time
+        return [str(v[0]) for v in slice.to_pydict().values()]
 
 
 class DuckDBAdapter(Adapter):

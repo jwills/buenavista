@@ -335,8 +335,17 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         self.wfile.write(sig + out)
 
     def send_data_rows(self, query_result: QueryResult):
-        for index in query_result.num_rows():
-            out = query_result.row(index)
+        for index in range(query_result.row_count()):
+            row = query_result.row(index)
+            buf = BVBuffer()
+            for r in row:
+                if r is None:
+                    buf.write_int32(-1)
+                else:
+                    v = r.encode("utf-8")
+                    buf.write_int32(len(v))
+                    buf.write_bytes(v)
+            out = buf.get_value()
             row_sig = struct.pack(
                 "!cih",
                 ServerResponse.DATA_ROW,
