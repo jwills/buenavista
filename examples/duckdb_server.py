@@ -1,7 +1,54 @@
 from typing import Dict
 
 import duckdb
+import pyarrow as pa
+
+from buenavista.core import BVBuffer
 from buenavista.adapter import *
+
+
+def oid(t: pa.DataType) -> int:
+    if pa.lib.is_boolean(t):
+        return BOOL_TYPE.oid
+    elif pa.lib.is_integer(t):
+        return INTEGER_TYPE.oid
+    elif pa.lib.is_string(t):
+        return TEXT_TYPE.oid
+    elif pa.lib.is_date(t):
+        return DATE_TYPE.oid
+    elif pa.lib.is_time(t):
+        return TIME_TYPE.oid
+    elif pa.lib.is_timestamp(t):
+        return TIMESTAMP_TYPE.oid
+    elif pa.lib.is_float(t):
+        return FLOAT_TYPE.oid
+    elif pa.lib.is_decimal(t):
+        return NUMERIC_TYPE.oid
+    elif pa.lib.is_binary(t):
+        return BYTES_TYPE.oid
+    else:
+        return UNKNOWN_TYPE.oid
+
+
+class DuckDBQueryResult(QueryResult):
+    def __init__(self, tbl: pa.Table):
+        self.tbl = tbl
+
+    def row_count(self):
+        return self.tbl.num_rows
+
+    def column_count(self):
+        return self.tbl.num_columns
+
+    def column(self, index: int) -> Tuple[str, int]:
+        s = self.tbl.schema[index]
+        return s.name, oid(s.type)
+
+    def row(self, index: int) -> bytes:
+        row = self.tbl.slice(offset=index, length=1)
+        buf = BVBuffer()
+        # TODO: fill this block in here
+        return buf.get_value()
 
 
 class DuckDBAdapter(Adapter):
@@ -41,55 +88,8 @@ class DuckDBAdapter(Adapter):
         else:
             cursor.execute(sql)
 
-        rows = []
-        if cursor.description:
-            if limit == -1:
-                rows = cursor.fetchall()
-            else:
-                rows = cursor.fetchmany(limit)
-
-        return self.to_query_result(cursor.description, rows)
-
-    def to_query_result(self, description, rows) -> QueryResult:
-        fields = []
-        for i, d in enumerate(description):
-            name, pytype = d[0], d[1]
-            f = None
-            if pytype == "bool":
-                f = Field(name, BOOL_TYPE)
-            elif pytype == "STRING":
-                f = Field(name, TEXT_TYPE)
-            elif pytype == "NUMERIC":
-                vals = [r[i] for r in rows[:10]]
-                if not vals:
-                    f = Field(name, NUMERIC_TYPE)
-                elif all(isinstance(v, int) for v in vals):
-                    f = Field(name, BIGINT_TYPE)
-                elif all(isinstance(v, float) for v in vals):
-                    f = Field(name, FLOAT_TYPE)
-                else:
-                    f = Field(name, NUMERIC_TYPE)
-            elif pytype == "DATETIME":
-                f = Field(name, TIMESTAMP_TYPE)
-            elif pytype == "TIMEDELTA":
-                f = Field(name, INTERVAL_TYPE)
-            elif pytype == "Time":
-                f = Field(name, TIME_TYPE)
-            elif pytype == "Date":
-                f = Field(name, DATE_TYPE)
-            elif pytype == "BINARY":
-                f = Field(name, BYTES_TYPE)
-            elif pytype == "NUMBER":
-                f = Field(name, NUMERIC_TYPE)
-            elif pytype == "dict":
-                f = Field(name, JSON_TYPE)
-            elif pytype == "list":
-                # TODO: array types?
-                f = Field(name, JSON_TYPE)
-            else:
-                f = Field(name, UNKNOWN_TYPE)
-            fields.append(f)
-        return QueryResult(fields, rows)
+        tbl = cursor.fetch_arrow_table()
+        return DuckDBQueryResult(tbl)
 
 
 if __name__ == "__main__":

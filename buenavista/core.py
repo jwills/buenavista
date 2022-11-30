@@ -4,7 +4,7 @@ import socketserver
 import struct
 from typing import Dict, List, Optional
 
-from buenavista.adapter import Adapter, AdapterHandle, Field, QueryResult
+from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +119,14 @@ class BVContext:
     def execute_sql(self, sql: str) -> QueryResult:
         return self.handle.execute_sql(sql)
 
-    def describe_portal(self, name: str) -> List[Field]:
+    def describe_portal(self, name: str) -> QueryResult:
         stmt, params = self.portals[name]
         sql = self.stmts[stmt]
-        query_result = self.handle.execute_sql(sql, params, limit=0)
-        return query_result.fields
+        return self.handle.execute_sql(sql, params, limit=0)
 
-    def describe_statement(self, name: str) -> List[Field]:
+    def describe_statement(self, name: str) -> QueryResult:
         sql = self.stmts[name]
-        query_result = self.handle.execute_sql(sql, limit=0)
-        return query_result.fields
+        return self.handle.execute_sql(sql, limit=0)
 
     def execute_portal(self, name: str, limit: int) -> QueryResult:
         stmt, params = self.portals[name]
@@ -232,9 +230,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_ready_for_query(ctx)
             return
 
-        self.send_row_description(query_result.fields)
+        self.send_row_description(query_result)
         self.send_data_rows(query_result)
-        self.send_command_complete("SELECT %d\x00" % len(query_result.rows))
+        self.send_command_complete("SELECT %d\x00" % query_result.row_count())
         self.send_ready_for_query(ctx)
 
     def handle_parse(self, ctx: BVContext, payload: bytes):
@@ -272,24 +270,24 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Handling describe")
         ba = bytearray(payload)
         describe_type = ba[0]
-        fields = []
+        query_result = None
         if describe_type == ord("P"):
             portal = ba[1 : len(ba) - 1].decode()
             try:
-                fields = ctx.describe_portal(portal)
+                query_result = ctx.describe_portal(portal)
             except Exception as e:
                 self.send_error(e, ctx)
                 return
         elif describe_type == ord("S"):
             stmt = ba[1 : len(ba) - 1].decode()
             try:
-                fields = ctx.describe_stmt(stmt)
+                query_result = ctx.describe_stmt(stmt)
             except Exception as e:
                 self.send_error(e, ctx)
                 return
         else:
             raise Exception(f"Unknown describe type: {describe_type}")
-        self.send_row_description(fields)
+        self.send_row_description(query_result)
 
     def handle_execute(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling execute")
@@ -307,7 +305,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_error(e, ctx)
             return
         self.send_data_rows(query_result)
-        self.send_command_complete("SELECT %d\x00" % len(query_result.rows))
+        self.send_command_complete("SELECT %d\x00" % query_result.row_count())
 
     def handle_close(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling close")
@@ -321,30 +319,29 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         self.send_close_complete()
         self.send_ready_for_query(ctx)
 
-    def send_row_description(self, fields: List[Field]):
+    def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
-        for f in fields:
-            buf.write_string(f.name)
-            buf.write_bytes(struct.pack("!ihihih", 0, 0, f.oid, 0, -1, 0))
+        for i in range(query_result.column_count()):
+            name, oid = query_result.column(i)
+            buf.write_string(name)
+            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, 0))
         out = buf.get_value()
         sig = struct.pack(
-            "!cih", ServerResponse.ROW_DESCRIPTION, len(out) + 6, len(fields)
+            "!cih",
+            ServerResponse.ROW_DESCRIPTION,
+            len(out) + 6,
+            query_result.column_count(),
         )
         self.wfile.write(sig + out)
 
     def send_data_rows(self, query_result: QueryResult):
-        for row in query_result.rows:
-            buf = BVBuffer()
-            for i, f in enumerate(query_result.fields):
-                if row[i] is None:
-                    buf.write_int32(-1)
-                else:
-                    v = f.to_bytes(row[i])
-                    buf.write_int32(len(v))
-                    buf.write_bytes(v)
-            out = buf.get_value()
+        for index in query_result.num_rows():
+            out = query_result.row(index)
             row_sig = struct.pack(
-                "!cih", ServerResponse.DATA_ROW, len(out) + 6, len(query_result.fields)
+                "!cih",
+                ServerResponse.DATA_ROW,
+                len(out) + 6,
+                query_result.column_count(),
             )
             self.wfile.write(row_sig + out)
 

@@ -1,7 +1,7 @@
 import datetime
 import json
 import random
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 class PGType:
@@ -33,27 +33,20 @@ TIMESTAMP_TYPE = PGType(1114, lambda v: v.isoformat())
 UNKNOWN_TYPE = PGType(705)
 
 
-class Field:
-    """A name/type pair for a field in a PostgreSQL table."""
-
-    def __init__(self, name, pg_type: PGType):
-        self.name = name
-        self.pg_type = pg_type
-
-    @property
-    def oid(self):
-        return self.pg_type.oid
-
-    def to_bytes(self, value) -> bytes:
-        return self.pg_type.converter(value).encode("utf-8")
-
-
 class QueryResult:
     """The BV representation of a result of a query."""
 
-    def __init__(self, fields: List[Field], rows):
-        self.fields = fields
-        self.rows = rows
+    def row_count(self):
+        raise NotImplementedError
+
+    def column_count(self):
+        raise NotImplementedError
+
+    def column(self, index: int) -> Tuple[str, int]:
+        raise NotImplementedError
+
+    def row(self, index: int) -> bytes:
+        raise NotImplementedError
 
 
 class AdapterHandle:
