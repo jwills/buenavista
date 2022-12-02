@@ -101,6 +101,7 @@ class BVContext:
         self.params = params
         self.stmts = {}
         self.portals = {}
+        self.result_cache = {}
         self.has_error = False
 
     def process_id(self):
@@ -122,16 +123,23 @@ class BVContext:
     def describe_portal(self, name: str) -> QueryResult:
         stmt, params = self.portals[name]
         sql = self.stmts[stmt]
-        return self.handle.execute_sql(sql, params, limit=0)
+        query_result = self.handle.execute_sql(sql=sql, params=params)
+        self.result_cache[name] = query_result
+        return query_result
 
     def describe_statement(self, name: str) -> QueryResult:
         sql = self.stmts[name]
-        return self.handle.execute_sql(sql, limit=0)
+        return self.handle.execute_sql(sql)
 
-    def execute_portal(self, name: str, limit: int) -> QueryResult:
-        stmt, params = self.portals[name]
-        sql = self.stmts[stmt]
-        return self.handle.execute_sql(sql=sql, params=params, limit=limit)
+    def execute_portal(self, name: str) -> QueryResult:
+        if name in self.result_cache:
+            query_result = self.result_cache[name]
+            del self.result_cache[name]
+            return query_result
+        else:
+            stmt, params = self.portals[name]
+            sql = self.stmts[stmt]
+            return self.handle.execute_sql(sql=sql, params=params)
 
     def add_statement(self, name: str, sql: str):
         self.stmts[name] = sql
@@ -231,8 +239,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return
 
         self.send_row_description(query_result)
-        self.send_data_rows(query_result)
-        self.send_command_complete("SELECT %d\x00" % query_result.row_count())
+        row_count = self.send_data_rows(query_result)
+        self.send_command_complete("SELECT %d\x00" % row_count)
         self.send_ready_for_query(ctx)
 
     def handle_parse(self, ctx: BVContext, payload: bytes):
@@ -252,17 +260,27 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         portal = ba[:portal_idx].decode()
         stmt_idx = ba.index(NULL_BYTE, portal_idx + 1)
         stmt = ba[portal_idx + 1 : stmt_idx].decode()
-        params = []
         buf = BVBuffer(io.BytesIO(ba[stmt_idx + 1 :]))
         # First param format stuff...
-        num_params = buf.read_int16()
-        for i in range(num_params):
-            buf.read_int16()
+        num_formats = buf.read_int16()
+        formats = []
+        for i in range(num_formats):
+            formats.append(buf.read_int16())
         # ... then the actual param values
         num_params = buf.read_int16()
+        if num_formats < num_params:
+            if formats:
+                formats = [formats[0]] * num_params
+            else:
+                formats = [0] * num_params
+        params = []
         for i in range(num_params):
-            len = buf.read_int32()
-            params.append(buf.read_bytes(len).decode())
+            nb = buf.read_int32()
+            v = buf.read_bytes(nb)
+            if formats[i] == 0:
+                params.append(v.decode())
+            else:
+                params.append(v.hex())
         ctx.add_portal(portal, stmt, params)
         self.send_bind_complete()
 
@@ -281,7 +299,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         elif describe_type == ord("S"):
             stmt = ba[1 : len(ba) - 1].decode()
             try:
-                query_result = ctx.describe_stmt(stmt)
+                query_result = ctx.describe_statement(stmt)
             except Exception as e:
                 self.send_error(e, ctx)
                 return
@@ -300,12 +318,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         limit = struct.unpack("!i", ba[portal_idx + 1 : portal_idx + 5])[0]
         query_result = None
         try:
-            query_result = ctx.execute_portal(portal, limit)
+            query_result = ctx.execute_portal(portal)
         except Exception as e:
             self.send_error(e, ctx)
             return
-        self.send_data_rows(query_result)
-        self.send_command_complete("SELECT %d\x00" % query_result.row_count())
+        row_count = self.send_data_rows(query_result, limit)
+        self.send_command_complete("SELECT %d\x00" % row_count)
 
     def handle_close(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling close")
@@ -334,9 +352,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         )
         self.wfile.write(sig + out)
 
-    def send_data_rows(self, query_result: QueryResult):
-        for index in range(query_result.row_count()):
-            row = query_result.row(index)
+    def send_data_rows(self, query_result: QueryResult, limit: int = 0) -> int:
+        cnt = 0
+        for row in query_result.rows():
             buf = BVBuffer()
             for r in row:
                 if r is None:
@@ -353,6 +371,10 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 query_result.column_count(),
             )
             self.wfile.write(row_sig + out)
+            cnt += 1
+            if limit > 0 and cnt >= limit:
+                break
+        return cnt
 
     def send_error(self, exception, ctx: Optional[BVContext] = None):
         estr = str(exception)

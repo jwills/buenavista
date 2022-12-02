@@ -5,6 +5,31 @@ import psycopg2
 from buenavista.adapter import *
 
 
+class PGQueryResult(QueryResult):
+    def __init__(
+        self, fields: List[Tuple[str, PGType]], rows: List[List[Optional[str]]]
+    ):
+        self.fields = fields
+        self.rows = rows
+
+    def column_count(self):
+        return len(self.fields)
+
+    def column(self, index: int) -> Tuple[str, int]:
+        return self.fields[index]
+
+    def rows(self) -> Iterator[List[Optional[str]]]:
+        for row in self.rows:
+            ret = []
+            for j, col in enumerate(self.fields):
+                pv = row[j]
+                if pv is None:
+                    ret.append(pv)
+                else:
+                    ret.append(col.converter(pv))
+            yield ret
+
+
 class Psycopg2Adapter(Adapter):
     def __init__(self, **kwargs):
         self.db = psycopg2.connect(**kwargs)
@@ -18,52 +43,43 @@ class Psycopg2Adapter(Adapter):
             "client_encoding": self.db.get_parameter_status("client_encoding"),
         }
 
-    def execute_sql(
-        self, cursor, sql: str, params=None, limit: int = -1
-    ) -> QueryResult:
-        if params:
-            cursor.execute(sql, params)
-        else:
-            cursor.execute(sql)
-
+    def execute_sql(self, cursor, sql: str, params=None) -> QueryResult:
+        cursor.execute(sql, params)
         rows = []
         if cursor.description:
-            if limit == -1:
-                rows = cursor.fetchall()
-            else:
-                rows = cursor.fetchmany(limit)
+            rows = cursor.fetchall()
         return self.to_query_result(cursor.description, rows)
 
     def to_query_result(self, description, rows) -> QueryResult:
         if not description:
-            return QueryResult([], [])
+            return PGQueryResult([], [])
 
         fields = []
         for d in description:
             name, oid = d[0], d[1]
             f = None
             if oid == BOOL_TYPE.oid:
-                f = Field(name, BOOL_TYPE)
+                f = (name, BOOL_TYPE)
             elif oid == TEXT_TYPE.oid:
-                f = Field(name, TEXT_TYPE)
+                f = (name, TEXT_TYPE)
             elif oid == NUMERIC_TYPE.oid:
-                f = Field(name, NUMERIC_TYPE)
+                f = (name, NUMERIC_TYPE)
             elif oid == TIMESTAMP_TYPE.oid:
-                f = Field(name, TIMESTAMP_TYPE)
+                f = (name, TIMESTAMP_TYPE)
             elif oid == INTERVAL_TYPE.oid:
-                f = Field(name, INTERVAL_TYPE)
+                f = (name, INTERVAL_TYPE)
             elif oid == TIME_TYPE.oid:
-                f = Field(name, TIME_TYPE)
+                f = (name, TIME_TYPE)
             elif oid == DATE_TYPE.oid:
-                f = Field(name, DATE_TYPE)
+                f = (name, DATE_TYPE)
             elif oid == BYTES_TYPE.oid:
-                f = Field(name, BYTES_TYPE)
+                f = (name, BYTES_TYPE)
             elif oid == INTEGER_TYPE.oid:
-                f = Field(name, INTEGER_TYPE)
+                f = (name, INTEGER_TYPE)
             else:
-                f = Field(name, UNKNOWN_TYPE)
+                f = (name, UNKNOWN_TYPE)
             fields.append(f)
-        return QueryResult(fields, rows)
+        return PGQueryResult(fields, rows)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import datetime
 import json
 import random
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 
 class PGType:
@@ -36,16 +36,13 @@ UNKNOWN_TYPE = PGType(705)
 class QueryResult:
     """The BV representation of a result of a query."""
 
-    def row_count(self):
-        raise NotImplementedError
-
     def column_count(self):
         raise NotImplementedError
 
     def column(self, index: int) -> Tuple[str, int]:
         raise NotImplementedError
 
-    def row(self, index: int) -> List[Optional[str]]:
+    def rows(self) -> Iterator[List[Optional[str]]]:
         raise NotImplementedError
 
 
@@ -59,8 +56,8 @@ class AdapterHandle:
     def close(self):
         self.cursor.close()
 
-    def execute_sql(self, sql: str, params=None, limit: int = -1) -> QueryResult:
-        return self.parent.execute_sql(self.cursor, sql, params, limit)
+    def execute_sql(self, sql: str, params=None) -> QueryResult:
+        return self.parent.execute_sql(self.cursor, sql, params)
 
 
 class Adapter:
@@ -74,9 +71,7 @@ class Adapter:
     def _cursor(self):
         raise NotImplementedError
 
-    def execute_sql(
-        self, cursor, sql: str, params=None, limit: int = -1
-    ) -> QueryResult:
+    def execute_sql(self, cursor, sql: str, params=None) -> QueryResult:
         raise NotImplementedError
 
     def cancel_query(self, process_id: int, secret_key: int):
