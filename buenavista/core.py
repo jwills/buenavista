@@ -213,7 +213,10 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_notice()
             return self.handle_startup(adapter)
         elif code == 196608:  # Protocol 3.0
-            msg = [x.decode() for x in self.r.read_bytes(msglen - 4).split(NULL_BYTE)]
+            msg = [
+                x.decode("utf-8")
+                for x in self.r.read_bytes(msglen - 4).split(NULL_BYTE)
+            ]
             params = dict(zip(msg[::2], msg[1::2]))
             logger.info("Client connection params: %s", params)
             ctx = BVContext(adapter.create_handle(), params)
@@ -230,9 +233,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             raise Exception(f"Unsupported startup message: {code}")
 
     def handle_query(self, ctx: BVContext, payload: bytes):
-        sql = payload.decode()
+        sql = payload.decode("utf-8").rstrip("\x00")
         try:
-            query_result = ctx.execute_sql(sql=sql)
+            query_result = ctx.execute_sql(sql)
         except Exception as e:
             self.send_error(e)
             self.send_ready_for_query(ctx)
@@ -247,9 +250,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Handling parse")
         ba = bytearray(payload)
         stmt_idx = ba.index(NULL_BYTE)
-        stmt = ba[:stmt_idx].decode()
+        stmt = ba[:stmt_idx].decode("utf-8")
         query_idx = ba.index(NULL_BYTE, stmt_idx + 1)
-        sql = ba[stmt_idx + 1 : query_idx].decode()
+        sql = ba[stmt_idx + 1 : query_idx].decode("utf-8")
         ctx.add_statement(stmt, sql)
         self.send_parse_complete()
 
@@ -257,9 +260,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Handling bind")
         ba = bytearray(payload)
         portal_idx = ba.index(NULL_BYTE)
-        portal = ba[:portal_idx].decode()
+        portal = ba[:portal_idx].decode("utf-8")
         stmt_idx = ba.index(NULL_BYTE, portal_idx + 1)
-        stmt = ba[portal_idx + 1 : stmt_idx].decode()
+        stmt = ba[portal_idx + 1 : stmt_idx].decode("utf-8")
         buf = BVBuffer(io.BytesIO(ba[stmt_idx + 1 :]))
         # First param format stuff...
         num_formats = buf.read_int16()
@@ -278,9 +281,11 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             nb = buf.read_int32()
             v = buf.read_bytes(nb)
             if formats[i] == 0:
-                params.append(v.decode())
+                params.append(v.decode("utf-8"))
             else:
-                params.append(v.hex())
+                # TODO: I shouldn't be always assuming these are always
+                # ints but I can live with it for now
+                params.append(int.from_bytes(v, "big"))
         ctx.add_portal(portal, stmt, params)
         self.send_bind_complete()
 
@@ -290,14 +295,14 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         describe_type = ba[0]
         query_result = None
         if describe_type == ord("P"):
-            portal = ba[1 : len(ba) - 1].decode()
+            portal = ba[1 : len(ba) - 1].decode("utf-8")
             try:
                 query_result = ctx.describe_portal(portal)
             except Exception as e:
                 self.send_error(e, ctx)
                 return
         elif describe_type == ord("S"):
-            stmt = ba[1 : len(ba) - 1].decode()
+            stmt = ba[1 : len(ba) - 1].decode("utf-8")
             try:
                 query_result = ctx.describe_statement(stmt)
             except Exception as e:
@@ -314,7 +319,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return
         ba = bytearray(payload)
         portal_idx = ba.index(NULL_BYTE)
-        portal = ba[:portal_idx].decode()
+        portal = ba[:portal_idx].decode("utf-8")
         limit = struct.unpack("!i", ba[portal_idx + 1 : portal_idx + 5])[0]
         query_result = None
         try:
@@ -329,9 +334,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Handling close")
         close_type = payload[0]
         if close_type == ord("S"):
-            ctx.close_statement(payload[1:].decode())
+            ctx.close_statement(payload[1:].decode("utf-8"))
         elif close_type == ord("P"):
-            ctx.close_portal(payload[1:].decode())
+            ctx.close_portal(payload[1:].decode("utf-8"))
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()

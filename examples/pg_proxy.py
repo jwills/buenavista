@@ -1,7 +1,6 @@
 from typing import Dict
 
-import psycopg2
-
+import pg8000.dbapi
 from buenavista.adapter import *
 
 
@@ -10,50 +9,49 @@ class PGQueryResult(QueryResult):
         self, fields: List[Tuple[str, PGType]], rows: List[List[Optional[str]]]
     ):
         self.fields = fields
-        self.rows = rows
+        self._rows = rows
 
     def column_count(self):
         return len(self.fields)
 
     def column(self, index: int) -> Tuple[str, int]:
-        return self.fields[index]
+        field = self.fields[index]
+        return (field[0], field[1].oid)
 
     def rows(self) -> Iterator[List[Optional[str]]]:
-        for row in self.rows:
-            ret = []
-            for j, col in enumerate(self.fields):
-                pv = row[j]
-                if pv is None:
-                    ret.append(pv)
-                else:
-                    ret.append(col.converter(pv))
-            yield ret
+        def t(row):
+            return [self.fields[i][1].converter(v) for i, v in enumerate(row)]
+
+        return iter(map(t, self._rows))
 
 
-class Psycopg2Adapter(Adapter):
+class PGAdapter(Adapter):
+    pg8000.dbapi.paramstyle = "numeric"
+
     def __init__(self, **kwargs):
-        self.db = psycopg2.connect(**kwargs)
+        self.db = pg8000.dbapi.connect(**kwargs)
+        self.db.autocommit = True
 
     def _cursor(self):
         return self.db.cursor()
 
     def parameters(self) -> Dict[str, str]:
-        return {
-            "server_version": self.db.get_parameter_status("server_version"),
-            "client_encoding": self.db.get_parameter_status("client_encoding"),
-        }
+        return {"server_version": "BV.pg8000.1", "client_encoding": "UTF8"}
 
     def execute_sql(self, cursor, sql: str, params=None) -> QueryResult:
-        cursor.execute(sql, params)
-        rows = []
+        if "$" in sql:
+            sql = sql.replace("$", ":")
+        if params:
+            cursor.execute(sql, params)
+        else:
+            cursor.execute(sql)
         if cursor.description:
             rows = cursor.fetchall()
-        return self.to_query_result(cursor.description, rows)
-
-    def to_query_result(self, description, rows) -> QueryResult:
-        if not description:
+            return self.to_query_result(cursor.description, rows)
+        else:
             return PGQueryResult([], [])
 
+    def to_query_result(self, description, rows) -> QueryResult:
         fields = []
         for d in description:
             name, oid = d[0], d[1]
@@ -86,7 +84,10 @@ if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
 
     address = ("localhost", 5433)
-    server = BuenaVistaServer(address, Psycopg2Adapter(database="postgres"))
+    server = BuenaVistaServer(
+        address,
+        PGAdapter(host="localhost", port=5432, user="postgres", database="postgres"),
+    )
     ip, port = server.server_address
     print("Listening on {ip}:{port}".format(ip=ip, port=port))
     server.serve_forever()
