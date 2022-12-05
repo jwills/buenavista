@@ -29,7 +29,7 @@ NUMERIC_TYPE = PGType(1700)
 NULL_TYPE = PGType(-1, lambda v: None)
 TEXT_TYPE = PGType(25)
 TIME_TYPE = PGType(1083, lambda v: v.isoformat())
-TIMESTAMP_TYPE = PGType(1114, lambda v: v.isoformat())
+TIMESTAMP_TYPE = PGType(1114, lambda v: v.isoformat().replace("T", " "))
 UNKNOWN_TYPE = PGType(705)
 
 
