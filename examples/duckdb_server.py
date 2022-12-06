@@ -68,19 +68,32 @@ class RecordBatchIterator(Iterator[List[Optional[str]]]):
 
 
 class DuckDBQueryResult(QueryResult):
-    def __init__(self, rbr: pa.RecordBatchReader):
-        self.rbr = rbr
-        self.pg_types = [pg_type(s.type) for s in rbr.schema]
+    def __init__(self, rbr: Optional[pa.RecordBatchReader] = None):
+        if rbr:
+            self.rbr = rbr
+            self.pg_types = [pg_type(s.type) for s in rbr.schema]
+        else:
+            self.rbr = None
+            self.pg_types = []
 
     def column_count(self):
-        return len(self.rbr.schema)
+        if self.rbr:
+            return len(self.rbr.schema)
+        else:
+            return 0
 
     def column(self, index: int) -> Tuple[str, int]:
-        s = self.rbr.schema[index]
-        return s.name, self.pg_types[index].oid
+        if self.rbr:
+            s = self.rbr.schema[index]
+            return s.name, self.pg_types[index].oid
+        else:
+            raise IndexError("No column at index %d" % index)
 
     def rows(self) -> Iterator[List[Optional[str]]]:
-        return RecordBatchIterator(self.rbr, self.pg_types)
+        if self.rbr:
+            return RecordBatchIterator(self.rbr, self.pg_types)
+        else:
+            return iter([])
 
 
 class DuckDBAdapter(Adapter):
@@ -99,13 +112,15 @@ class DuckDBAdapter(Adapter):
     def rewrite_sql(self, sql: str) -> str:
         """Some minimalist SQL rewrites, inspired by postlite, to make DBeaver less unhappy."""
         if sql.startswith("SET "):
-            return "SELECT 'SET'"
+            return ""
         elif sql == "SHOW search_path":
             return "SELECT 'public' as search_path"
         elif sql == "SHOW TRANSACTION ISOLATION LEVEL":
             return "SELECT 'read committed' as transaction_isolation"
         elif "::regclass" in sql:
             return sql.replace("::regclass", "")
+        elif "::regtype" in sql:
+            return sql.replace("::regtype", "")
         elif "pg_get_expr(ad.adbin, ad.adrelid, true)" in sql:
             return sql.replace(
                 "pg_get_expr(ad.adbin, ad.adrelid, true)",
@@ -123,7 +138,9 @@ class DuckDBAdapter(Adapter):
         else:
             cursor.execute(sql)
 
-        rb = cursor.fetch_record_batch()
+        rb = None
+        if cursor.description:
+            rb = cursor.fetch_record_batch()
         return DuckDBQueryResult(rb)
 
 
@@ -143,7 +160,7 @@ if __name__ == "__main__":
         "CREATE OR REPLACE VIEW pg_catalog.pg_database AS SELECT 0 oid, 'main' datname"
     )
     db.execute(
-        "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
+        "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace, return_type prorettype, parameters proargnames, function_type = 'aggregate' proisagg, function_type = 'table' proretset FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
     )
     db.execute(
         "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT name, value setting, description short_desc, CASE WHEN input_type = 'VARCHAR' THEN 'string' WHEN input_type = 'BOOLEAN' THEN 'bool' WHEN input_type IN ('BIGINT', 'UBIGINT') THEN 'integer' ELSE input_type END vartype FROM duckdb_settings()"

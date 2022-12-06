@@ -281,7 +281,11 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             nb = buf.read_int32()
             v = buf.read_bytes(nb)
             if formats[i] == 0:
-                params.append(v.decode("utf-8"))
+                decoded = v.decode("utf-8")
+                if decoded.startswith("{") and decoded.endswith("}"):
+                    params.append(decoded[1:-1].split(","))
+                else:
+                    params.append(decoded)
             else:
                 # TODO: I shouldn't be always assuming these are always
                 # ints but I can live with it for now
