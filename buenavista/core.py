@@ -172,11 +172,16 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             ctx = self.handle_startup(self.server.adapter)
             while ctx:
                 type_code = self.r.read_byte()
+                if not type_code or type_code == ClientCommand.TERMINATE:
+                    # we're done
+                    break
+
                 msglen = self.r.read_uint32()
                 if msglen > 4:
                     payload = self.r.read_bytes(msglen - 4)
                 else:
                     payload = None
+
                 if type_code == ClientCommand.QUERY:
                     self.handle_query(ctx, payload)
                 elif type_code == ClientCommand.PARSE:
@@ -194,8 +199,6 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                     self.send_ready_for_query(ctx)
                 elif type_code == ClientCommand.FLUSH:
                     ctx.flush()
-                elif type_code == ClientCommand.TERMINATE:
-                    break  # we're done
                 else:
                     raise Exception("Unknown type_code: %s" % type_code)
         except Exception as e:
