@@ -7,7 +7,8 @@ import pyarrow as pa
 from buenavista.core import BVBuffer
 from buenavista.adapter import *
 
-EXPECT_ROWS = r"^(SELECT|SHOW|DESCRIBE|WITH)\s"
+EXPECT_ROWS = r"^\s*(SELECT|SHOW|DESCRIBE|WITH)\s"
+
 
 def pg_type(t: pa.DataType) -> PGType:
     if pa.types.is_boolean(t):

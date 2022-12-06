@@ -459,6 +459,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
 class BuenaVistaServer(socketserver.ThreadingTCPServer):
     """A Python socketserver for the Buena Vista Postgres proxy."""
+
     allow_reuse_address = True
 
     def __init__(self, server_address, adapter: Adapter):
