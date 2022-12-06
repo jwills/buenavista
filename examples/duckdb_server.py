@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Optional, Tuple
 
 import duckdb
@@ -6,6 +7,7 @@ import pyarrow as pa
 from buenavista.core import BVBuffer
 from buenavista.adapter import *
 
+EXPECT_ROWS = r"^(SELECT|SHOW|DESCRIBE|WITH)\s"
 
 def pg_type(t: pa.DataType) -> PGType:
     if pa.types.is_boolean(t):
@@ -76,6 +78,9 @@ class DuckDBQueryResult(QueryResult):
             self.rbr = None
             self.pg_types = []
 
+    def has_results(self) -> bool:
+        return self.rbr is not None
+
     def column_count(self):
         if self.rbr:
             return len(self.rbr.schema)
@@ -107,6 +112,7 @@ class DuckDBAdapter(Adapter):
         return {
             "server_version": "postduck.0.6",
             "client_encoding": "UTF8",
+            "DateStyle": "ISO",
         }
 
     def rewrite_sql(self, sql: str) -> str:
@@ -139,7 +145,7 @@ class DuckDBAdapter(Adapter):
             cursor.execute(sql)
 
         rb = None
-        if cursor.description:
+        if cursor.description and re.match(EXPECT_ROWS, sql, re.IGNORECASE):
             rb = cursor.fetch_record_batch()
         return DuckDBQueryResult(rb)
 

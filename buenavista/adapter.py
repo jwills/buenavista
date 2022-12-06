@@ -36,6 +36,9 @@ UNKNOWN_TYPE = PGType(705)
 class QueryResult:
     """The BV representation of a result of a query."""
 
+    def has_results(self) -> bool:
+        raise NotImplementedError
+
     def column_count(self):
         raise NotImplementedError
 

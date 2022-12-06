@@ -2,7 +2,7 @@ import io
 import logging
 import socketserver
 import struct
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 
@@ -233,6 +233,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             raise Exception(f"Unsupported startup message: {code}")
 
     def handle_query(self, ctx: BVContext, payload: bytes):
+        logger.debug("Handle query")
         sql = payload.decode("utf-8").rstrip("\x00")
         try:
             query_result = ctx.execute_sql(sql)
@@ -241,9 +242,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_ready_for_query(ctx)
             return
 
-        self.send_row_description(query_result)
-        row_count = self.send_data_rows(query_result)
-        self.send_command_complete("SELECT %d\x00" % row_count)
+        if query_result.has_results():
+            self.send_row_description(query_result)
+            row_count = self.send_data_rows(query_result)
+            self.send_command_complete("SELECT %d\x00" % row_count)
+        else:
+            self.send_command_complete("\x00")
         self.send_ready_for_query(ctx)
 
     def handle_parse(self, ctx: BVContext, payload: bytes):
@@ -290,6 +294,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 # TODO: I shouldn't be always assuming these are always
                 # ints but I can live with it for now
                 params.append(int.from_bytes(v, "big"))
+        logger.debug("Bind params: %s", params)
         ctx.add_portal(portal, stmt, params)
         self.send_bind_complete()
 
@@ -454,6 +459,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
 class BuenaVistaServer(socketserver.ThreadingTCPServer):
     """A Python socketserver for the Buena Vista Postgres proxy."""
+    allow_reuse_address = True
 
     def __init__(self, server_address, adapter: Adapter):
         super().__init__(server_address, BuenaVistaHandler)
