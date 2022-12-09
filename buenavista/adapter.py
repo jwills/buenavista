@@ -1,4 +1,3 @@
-import datetime
 import json
 import random
 from typing import Dict, Iterator, List, Optional, Tuple
@@ -50,31 +49,22 @@ class QueryResult:
 
 
 class AdapterHandle:
-    def __init__(self, cursor, parent: "Adapter", process_id: int, secret_key: int):
+    def __init__(self, cursor):
         self.cursor = cursor
-        self.parent = parent
-        self.process_id = process_id
-        self.secret_key = secret_key
+        self.process_id = random.randint(0, 2**31 - 1)
+        self.secret_key = random.randint(0, 2**31 - 1)
 
     def close(self):
         self.cursor.close()
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
-        return self.parent.execute_sql(self.cursor, sql, params)
+        raise NotImplementedError
 
 
 class Adapter:
     """Translation layer from an upstream data source into the BV representation of a query result."""
 
     def create_handle(self) -> AdapterHandle:
-        return AdapterHandle(
-            self._cursor(), self, random.randint(0, 1000000), random.randint(0, 1000000)
-        )
-
-    def _cursor(self):
-        raise NotImplementedError
-
-    def execute_sql(self, cursor, sql: str, params=None) -> QueryResult:
         raise NotImplementedError
 
     def cancel_query(self, process_id: int, secret_key: int):

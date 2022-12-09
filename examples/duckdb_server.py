@@ -1,4 +1,3 @@
-import re
 from typing import Dict, List, Optional, Tuple
 
 import duckdb
@@ -6,8 +5,6 @@ import pyarrow as pa
 
 from buenavista.core import BVBuffer
 from buenavista.adapter import *
-
-EXPECT_ROWS = r"^\s*(SELECT|SHOW|DESCRIBE|WITH)\s"
 
 
 def pg_type(t: pa.DataType) -> PGType:
@@ -102,25 +99,31 @@ class DuckDBQueryResult(QueryResult):
             return iter([])
 
 
-class DuckDBAdapter(Adapter):
-    def __init__(self, db):
-        self.db = db
+class DuckDBAdapterHandle(AdapterHandle):
+    def __init__(self, cursor):
+        super().__init__(cursor)
+        self.in_txn = False
+        self.refresh_config()
 
-    def _cursor(self):
-        return self.db.cursor()
-
-    def parameters(self) -> Dict[str, str]:
-        return {
-            "server_version": "postduck.0.6",
-            "client_encoding": "UTF8",
-            "DateStyle": "ISO",
-        }
+    def refresh_config(self):
+        self.config_params = set(
+            [
+                r[0]
+                for r in self.cursor.execute(
+                    "SELECT name FROM duckdb_settings()"
+                ).fetchall()
+            ]
+        )
 
     def rewrite_sql(self, sql: str) -> str:
         """Some minimalist SQL rewrites, inspired by postlite, to make DBeaver less unhappy."""
         if sql.startswith("SET "):
-            return ""
-        elif sql == "SHOW search_path":
+            tokens = sql.split()
+            if tokens[1].lower() in self.config_params:
+                return sql
+            else:
+                return ""
+        if sql == "SHOW search_path":
             return "SELECT 'public' as search_path"
         elif sql == "SHOW TRANSACTION ISOLATION LEVEL":
             return "SELECT 'read committed' as transaction_isolation"
@@ -133,22 +136,55 @@ class DuckDBAdapter(Adapter):
                 "pg_get_expr(ad.adbin, ad.adrelid, true)",
                 "pg_get_expr(ad.adbin, ad.adrelid)",
             )
-
         return sql
 
-    def execute_sql(self, cursor, sql: str, params=None) -> QueryResult:
+    def execute_sql(self, sql: str, params=None) -> QueryResult:
+        lsql = sql.lower()
+        if self.in_txn:
+            if "commit" in lsql:
+                self.in_txn = False
+            elif "rollback" in lsql:
+                self.in_txn = False
+            elif "begin" in lsql:
+                return DuckDBQueryResult()
+        elif "begin" in lsql:
+            self.in_txn = True
+
         print("Original SQL:", sql)
         sql = self.rewrite_sql(sql)
         print("Rewritten SQL:", sql)
         if params:
-            cursor.execute(sql, params)
+            self.cursor.execute(sql, params)
         else:
-            cursor.execute(sql)
+            self.cursor.execute(sql)
 
         rb = None
-        if cursor.description and re.match(EXPECT_ROWS, sql, re.IGNORECASE):
-            rb = cursor.fetch_record_batch()
+        if self.cursor.description:
+            if (
+                "select" in lsql
+                or "with" in lsql
+                or "describe" in lsql
+                or "show" in lsql
+            ):
+                rb = self.cursor.fetch_record_batch()
+            elif "load " in lsql:
+                self.refresh_config()
         return DuckDBQueryResult(rb)
+
+
+class DuckDBAdapter(Adapter):
+    def __init__(self, db):
+        self.db = db
+
+    def parameters(self) -> Dict[str, str]:
+        return {
+            "server_version": "postduck.0.6",
+            "client_encoding": "UTF8",
+            "DateStyle": "ISO",
+        }
+
+    def create_handle(self) -> AdapterHandle:
+        return DuckDBAdapterHandle(self.db.cursor())
 
 
 if __name__ == "__main__":
