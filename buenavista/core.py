@@ -468,3 +468,7 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
     def __init__(self, server_address, adapter: Adapter):
         super().__init__(server_address, BuenaVistaHandler)
         self.adapter = adapter
+
+    def verify_request(self, request, client_address) -> bool:
+        """Ensure all requests come from localhost until auth is in place"""
+        return client_address[0] == '127.0.0.1'
