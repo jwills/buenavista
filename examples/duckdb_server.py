@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Tuple
 
 import duckdb
 import pyarrow as pa
+import os
 
 from buenavista.core import BVBuffer
 from buenavista.adapter import *
@@ -216,10 +217,22 @@ if __name__ == "__main__":
     db.execute(
         "CREATE OR REPLACE FUNCTION pg_catalog.pg_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
     )
-    address = ("localhost", 5433)
+
+    bv_host = "0.0.0.0"
+    bv_port = 5433
+
+    if 'BUENAVISTA_HOST' in os.environ:
+        bv_host = os.environ['BUENAVISTA_HOST']
+
+    if 'BUENAVISTA_PORT' in os.environ:
+        bv_port = int(os.environ['BUENAVISTA_PORT'])
+
+    address = (bv_host, bv_port)
+
     server = BuenaVistaServer(address, DuckDBAdapter(db))
     ip, port = server.server_address
     print("Listening on {ip}:{port}".format(ip=ip, port=port))
+
     try:
         server.serve_forever()
     finally:

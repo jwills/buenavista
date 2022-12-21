@@ -1,0 +1,14 @@
+version: '3.7'
+
+services:
+
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    ports:
+      - "8978:8978"
+
+  buenavista:
+    image: buenavista
+    environment:
+      - BUENAVISTA_HOST=0.0.0.0
+      - BUENAVISTA_PORT=5433
