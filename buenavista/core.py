@@ -472,4 +472,4 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
 
     def verify_request(self, request, client_address) -> bool:
         """Ensure all requests come from localhost until auth is in place"""
-        return client_address[0] == '127.0.0.1' or 'BUENAVISTA_HOST' in os.environ
+        return client_address[0] == "127.0.0.1" or "BUENAVISTA_HOST" in os.environ
