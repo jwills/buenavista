@@ -14,7 +14,7 @@ def pg_type(t: pa.DataType) -> PGType:
     elif pa.types.is_int64(t):
         return PGTypes.BIGINT
     elif pa.types.is_integer(t):
-        return PGTypes.BINTEGER_TYPE
+        return PGTypes.INTEGER
     elif pa.types.is_string(t):
         return PGTypes.TEXT
     elif pa.types.is_date(t):
