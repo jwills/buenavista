@@ -1,6 +1,8 @@
+import os
 from typing import Dict, Iterator, List, Optional, Tuple
 
 import pg8000.dbapi
+
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 from buenavista.types import PGType, PGTypes
 
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     address = ("localhost", 5433)
     server = BuenaVistaServer(
         address,
-        PGAdapter(host="localhost", port=5432, user="jwills", database="postgres"),
+        PGAdapter(host="localhost", port=5432, user=os.getenv("USER"), database="postgres"),
     )
     ip, port = server.server_address
     print("Listening on {ip}:{port}".format(ip=ip, port=port))
