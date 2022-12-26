@@ -1,41 +1,41 @@
-from typing import Dict, List, Optional, Tuple
+import os
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import duckdb
 import pyarrow as pa
-import os
 
-from buenavista.core import BVBuffer
-from buenavista.adapter import *
+from buenavista.adapter import Adapter, AdapterHandle, QueryResult
+from buenavista.types import PGType, PGTypes
 
 
 def pg_type(t: pa.DataType) -> PGType:
     if pa.types.is_boolean(t):
-        return BOOL_TYPE
+        return PGTypes.BOOL
     elif pa.types.is_int64(t):
-        return BIGINT_TYPE
+        return PGTypes.BIGINT
     elif pa.types.is_integer(t):
-        return INTEGER_TYPE
+        return PGTypes.INTEGER
     elif pa.types.is_string(t):
-        return TEXT_TYPE
+        return PGTypes.TEXT
     elif pa.types.is_date(t):
-        return DATE_TYPE
+        return PGTypes.DATE
     elif pa.types.is_time(t):
-        return TIME_TYPE
+        return PGTypes.TIME
     elif pa.types.is_timestamp(t):
-        return TIMESTAMP_TYPE
+        return PGTypes.TIMESTAMP
     elif pa.types.is_floating(t):
-        return FLOAT_TYPE
+        return PGTypes.FLOAT
     elif pa.types.is_decimal(t):
-        return NUMERIC_TYPE
+        return PGTypes.NUMERIC
     elif pa.types.is_binary(t):
-        return BYTES_TYPE
+        return PGTypes.BYTES
     elif pa.types.is_interval(t):
-        return INTERVAL_TYPE
+        return PGTypes.INTERVAL
     elif pa.types.is_list(t) or pa.types.is_struct(t) or pa.types.is_map(t):
         # TODO: support detailed nested types
-        return TEXT_TYPE
+        return PGTypes.TEXT
     else:
-        return UNKNOWN_TYPE
+        return PGTypes.UNKNOWN
 
 
 class RecordBatchIterator(Iterator[List[Optional[str]]]):
@@ -221,11 +221,11 @@ if __name__ == "__main__":
     bv_host = "0.0.0.0"
     bv_port = 5433
 
-    if 'BUENAVISTA_HOST' in os.environ:
-        bv_host = os.environ['BUENAVISTA_HOST']
+    if "BUENAVISTA_HOST" in os.environ:
+        bv_host = os.environ["BUENAVISTA_HOST"]
 
-    if 'BUENAVISTA_PORT' in os.environ:
-        bv_port = int(os.environ['BUENAVISTA_PORT'])
+    if "BUENAVISTA_PORT" in os.environ:
+        bv_port = int(os.environ["BUENAVISTA_PORT"])
 
     address = (bv_host, bv_port)
 
