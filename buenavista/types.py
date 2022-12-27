@@ -11,16 +11,12 @@ class PGType:
         if oid in self._instances:
             raise ValueError(f"Duplicate OID {oid} declared for PGType")
         self.oid = oid
-        if not converter:
-            self.converter = lambda x: str(x)
-        else:
-            self.converter = converter
+        self.converter = converter or str
         self._instances[oid] = self
 
     @classmethod
     def find_by_oid(cls, oid: int) -> Optional["PGType"]:
-        t = cls._instances.get(oid)
-        return PGTypes.UNKNOWN if not t else t
+        return cls._instances.get(oid, PGTypes.UNKNOWN)
 
 
 class PGTypes:

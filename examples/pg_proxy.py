@@ -32,9 +32,6 @@ class PGQueryResult(QueryResult):
 
 
 class PGAdapterHandle(AdapterHandle):
-    def __init__(self, cursor):
-        super().__init__(cursor)
-
     def execute_sql(self, sql: str, params=None) -> QueryResult:
         if "$" in sql:
             sql = sql.replace("$", ":")
@@ -77,7 +74,9 @@ if __name__ == "__main__":
     address = ("localhost", 5433)
     server = BuenaVistaServer(
         address,
-        PGAdapter(host="localhost", port=5432, user=os.getenv("USER"), database="postgres"),
+        PGAdapter(
+            host="localhost", port=5432, user=os.getenv("USER"), database="postgres"
+        ),
     )
     ip, port = server.server_address
     print("Listening on {ip}:{port}".format(ip=ip, port=port))
