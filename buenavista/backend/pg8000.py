@@ -4,7 +4,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import pg8000.dbapi
 
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
-from buenavista.types import PGType, PGTypes
+from buenavista.types import PGType
 
 
 class PGQueryResult(QueryResult):

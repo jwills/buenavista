@@ -10,7 +10,7 @@ with open(os.path.join(this_directory, "README.md")) as f:
     long_description = f.read()
 
 package_name = "buenavista"
-package_version = "0.0.1"
+package_version = "0.1.0"
 
 description = """A Programmable Postgres Proxy Server"""
 
@@ -26,4 +26,8 @@ setup(
     license="Apache",
     packages=["buenavista"],
     include_package_data=True,
+    extras_require = {
+      "duckdb": ["duckdb", "pyarrow"],
+      "pg8000": ["pg8000"],
+    }
 )

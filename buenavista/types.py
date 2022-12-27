@@ -1,4 +1,3 @@
-from typing import Optional
 import json
 
 
@@ -15,7 +14,7 @@ class PGType:
         self._instances[oid] = self
 
     @classmethod
-    def find_by_oid(cls, oid: int) -> Optional["PGType"]:
+    def find_by_oid(cls, oid: int) -> "PGType":
         return cls._instances.get(oid, PGTypes.UNKNOWN)
 
 

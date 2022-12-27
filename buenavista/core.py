@@ -1,11 +1,11 @@
 import io
-import os
 import logging
+import os
 import socketserver
 import struct
 from typing import Dict, Optional
 
-from buenavista.adapter import Adapter, AdapterHandle, QueryResult
+from .adapter import Adapter, AdapterHandle, QueryResult
 
 logger = logging.getLogger(__name__)
 

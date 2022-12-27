@@ -11,6 +11,8 @@ ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 
 WORKDIR /src
+COPY dev-requirements.txt .
+RUN pip install -r dev-requirements.txt
 
 COPY . .
 
@@ -20,4 +22,4 @@ RUN python setup.py install
 EXPOSE 5433
 
 ENTRYPOINT ["/tini", "--"]
-CMD PYTHONPATH=. python3 examples/duckdb_server.py
+CMD python -m buenavista.backend.duckdb
