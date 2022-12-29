@@ -27,6 +27,7 @@ setup(
     packages=["buenavista"],
     include_package_data=True,
     extras_require={
+        "api": ["fastapi"],
         "duckdb": ["duckdb", "pyarrow"],
         "pg8000": ["pg8000"],
     },

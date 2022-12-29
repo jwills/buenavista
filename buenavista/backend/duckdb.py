@@ -177,6 +177,27 @@ class DuckDBAdapter(Adapter):
     def __init__(self, db):
         super().__init__()
         self.db = db
+        self._do_setup()
+
+    def _do_setup(self):
+        # some tables/view definitions we need for DBeaver
+        if duckdb.__version__ < "0.6.1":
+            self.db.execute(
+                "CREATE OR REPLACE VIEW pg_catalog.pg_database AS SELECT 0 oid, 'main' datname"
+            )
+            self.db.execute(
+                "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace, return_type prorettype, parameters proargnames, function_type = 'aggregate' proisagg, function_type = 'table' proretset FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
+            )
+            self.db.execute(
+                "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT name, value setting, description short_desc, CASE WHEN input_type = 'VARCHAR' THEN 'string' WHEN input_type = 'BOOLEAN' THEN 'bool' WHEN input_type IN ('BIGINT', 'UBIGINT') THEN 'integer' ELSE input_type END vartype FROM duckdb_settings()"
+            )
+
+        self.db.execute(
+            "CREATE OR REPLACE FUNCTION pg_catalog.pg_total_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
+        )
+        self.db.execute(
+            "CREATE OR REPLACE FUNCTION pg_catalog.pg_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
+        )
 
     def parameters(self) -> Dict[str, str]:
         return {
@@ -199,25 +220,6 @@ if __name__ == "__main__":
     else:
         print("Using DuckDB database at", sys.argv[1])
         db = duckdb.connect(sys.argv[1])
-
-    # some tables/view definitions we need for DBeaver
-    if duckdb.__version__ < "0.6.1":
-        db.execute(
-            "CREATE OR REPLACE VIEW pg_catalog.pg_database AS SELECT 0 oid, 'main' datname"
-        )
-        db.execute(
-            "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace, return_type prorettype, parameters proargnames, function_type = 'aggregate' proisagg, function_type = 'table' proretset FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
-        )
-        db.execute(
-            "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT name, value setting, description short_desc, CASE WHEN input_type = 'VARCHAR' THEN 'string' WHEN input_type = 'BOOLEAN' THEN 'bool' WHEN input_type IN ('BIGINT', 'UBIGINT') THEN 'integer' ELSE input_type END vartype FROM duckdb_settings()"
-        )
-
-    db.execute(
-        "CREATE OR REPLACE FUNCTION pg_catalog.pg_total_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
-    )
-    db.execute(
-        "CREATE OR REPLACE FUNCTION pg_catalog.pg_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
-    )
 
     bv_host = "0.0.0.0"
     bv_port = 5433
