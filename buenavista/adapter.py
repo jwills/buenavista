@@ -42,12 +42,8 @@ class Adapter:
         self._handles[handle.process_id] = handle
         return handle
 
-    def get_handle(self, process_id: int, secret_key: int) -> Optional[AdapterHandle]:
-        if process_id in self._handles:
-            h = self._handles[process_id]
-            if secret_key == h.secret_key:
-                return h
-        return None
+    def get_handle(self, process_id: int) -> Optional[AdapterHandle]:
+        return self._handles.get(process_id)
 
     def close_handle(self, handle: AdapterHandle):
         if handle and handle.process_id in self._handles:

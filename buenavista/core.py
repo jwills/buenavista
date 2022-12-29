@@ -232,7 +232,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
             handle = adapter.get_handle(process_id, secret_key)
-            if handle:
+            if handle and handle.secret_key == secret_key:
                 adapter.close_handle(handle)
             return None
         else:
