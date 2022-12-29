@@ -116,6 +116,9 @@ class DuckDBAdapterHandle(AdapterHandle):
             ]
         )
 
+    def load_df_function(self, table: str):
+        return self.cursor.query(f"select * from {table}")
+
     def rewrite_sql(self, sql: str) -> str:
         """Some minimalist SQL rewrites, inspired by postlite, to make DBeaver less unhappy."""
         if sql.startswith("SET "):

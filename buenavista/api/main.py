@@ -29,10 +29,13 @@ def startup():
 def submit_dbt_python_job(
     job: dbt_runner.DbtPythonJob, background_tasks: BackgroundTasks
 ):
+    handle = app.adapter.get_handle(job.process_id)
+    if not handle:
+        return {"ok": False, "status": "No handle found for given process ID"}
     background_tasks.add_task(
         dbt_runner.run_python_job,
         job=job,
-        adapter=app.adapter,
+        handle=handle,
         process_status=app.process_status,
     )
     res = {"ok": True, "status": "Submitted"}

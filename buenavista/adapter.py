@@ -30,6 +30,9 @@ class AdapterHandle:
     def execute_sql(self, sql: str, params=None) -> QueryResult:
         raise NotImplementedError
 
+    def load_df_function(self, table: str):
+        raise NotImplementedError
+
 
 class Adapter:
     """Translation layer from an upstream data source into the BV representation of a query result."""

@@ -4,7 +4,7 @@ import tempfile
 
 from pydantic import BaseModel
 
-from buenavista.adapter import Adapter
+from buenavista.adapter import AdapterHandle
 
 
 class DbtPythonJob(BaseModel):
@@ -13,15 +13,7 @@ class DbtPythonJob(BaseModel):
     module_definition: str
 
 
-def run_python_job(job: DbtPythonJob, adapter: Adapter, process_status: dict):
-    handle = adapter.get_handle(job.process_id)
-    if not handle:
-        process_status[job.process_id] = {
-            "ok": False,
-            "status": "No handle found for process_id",
-        }
-        return
-
+def run_python_job(job: DbtPythonJob, handle: AdapterHandle, process_status: dict):
     mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
     mod_file.write(job.module_definition.lstrip().encode("utf-8"))
     mod_file.close()
