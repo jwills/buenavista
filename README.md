@@ -7,19 +7,17 @@ I started working on this project in order to address a common issue that people
 one of my Python projects, [dbt-duckdb](https://github.com/jwills/dbt-duckdb): when a long-running Python process
 is operating on a [DuckDB](http://duckdb.org) database, you cannot connect to the DuckDB file using the CLI or
 with a database query tool like [DBeaver](https://dbeaver.io/) to examine the state of the database, because each DuckDB file
-may only be open by a single process at a time. Using Buena Vista, we can start a thread in a long-running Python process like
-dbt-duckdb so that we can run queries against the data from DuckDB while the process is running, without having to wait until
-it has finished. I've implemented a prototype of this idea within the Buena Vista library at [examples/duckdb_server.py](examples/duckdb_server.py),
-and you can run it like so:
+may only be open by a single process at a time. The Buena Vista library makes it possible to work with a DuckDB database
+from multiple different processes over the Postgres wire protocol, and the library makes it simple enough to run an example
+that illustrates the idea locally:
 
 ```
 git clone https://github.com/jwills/buenavista.git
-cd buenavista
-PYTHONPATH=. python3 examples/duckdb_server.py [duckdb.dbfile]
+pip3 install .
+python3 -m buenavista.backend.duckdb <optional_duckdb_file>
 ```
 
 in order to start a Postgres server on `localhost:5433` backed by the DuckDB database file that you passed in at the command line
 (or by an in-memory DuckDB database if you do not specify an argument.) You should be able to query the database via `psql` in
 another window by running `psql -h localhost -p 5433` (no database/username/password arguments required) or by using the DBeaver
-Postgres client connection. (Note: there is still some work to do around transaction handling and making the full DuckDB
-table/view catalog accessible to DBeaver, but most queries should run successfully.)
+Postgres client connection.
