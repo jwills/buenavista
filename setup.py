@@ -26,8 +26,8 @@ setup(
     license="Apache",
     packages=["buenavista"],
     include_package_data=True,
-    extras_require = {
-      "duckdb": ["duckdb", "pyarrow"],
-      "pg8000": ["pg8000"],
-    }
+    extras_require={
+        "duckdb": ["duckdb", "pyarrow"],
+        "pg8000": ["pg8000"],
+    },
 )

@@ -175,6 +175,7 @@ class DuckDBAdapterHandle(AdapterHandle):
 
 class DuckDBAdapter(Adapter):
     def __init__(self, db):
+        super().__init__()
         self.db = db
 
     def parameters(self) -> Dict[str, str]:
@@ -184,7 +185,7 @@ class DuckDBAdapter(Adapter):
             "DateStyle": "ISO",
         }
 
-    def create_handle(self) -> AdapterHandle:
+    def new_handle(self) -> AdapterHandle:
         return DuckDBAdapterHandle(self.db.cursor())
 
 

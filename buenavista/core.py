@@ -207,7 +207,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_error(e)
 
         if ctx:
-            ctx.close()
+            self.server.adapter.close_handle(ctx.handle)
             ctx = None
 
     def handle_startup(self, adapter: Adapter) -> BVContext:
@@ -231,7 +231,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return ctx
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
-            adapter.cancel_query(process_id, secret_key)
+            handle = adapter.get_handle(process_id, secret_key)
+            if handle:
+                adapter.close_handle(handle)
             return None
         else:
             raise Exception(f"Unsupported startup message: {code}")

@@ -34,11 +34,28 @@ class AdapterHandle:
 class Adapter:
     """Translation layer from an upstream data source into the BV representation of a query result."""
 
-    def create_handle(self) -> AdapterHandle:
-        raise NotImplementedError
+    def __init__(self):
+        self._handles = {}
 
-    def cancel_query(self, process_id: int, secret_key: int):
-        print("Cancel request for process %d, secret key %d" % (process_id, secret_key))
+    def create_handle(self) -> AdapterHandle:
+        handle = self.new_handle()
+        self._handles[handle.process_id] = handle
+        return handle
+
+    def get_handle(self, process_id: int, secret_key: int) -> Optional[AdapterHandle]:
+        if process_id in self._handles:
+            h = self._handles[process_id]
+            if secret_key == h.secret_key:
+                return h
+        return None
+
+    def close_handle(self, handle: AdapterHandle):
+        if handle and handle.process_id in self._handles:
+            del self._handles[handle.process_id]
+            handle.close()
+
+    def new_handle(self) -> AdapterHandle:
+        raise NotImplementedError
 
     def parameters(self) -> Dict[str, str]:
         return {}

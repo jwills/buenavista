@@ -58,10 +58,11 @@ class PGAdapter(Adapter):
     pg8000.dbapi.paramstyle = "numeric"
 
     def __init__(self, **kwargs):
+        super.__init__()
         self.db = pg8000.dbapi.connect(**kwargs)
         self.db.autocommit = True
 
-    def create_handle(self) -> AdapterHandle:
+    def new_handle(self) -> AdapterHandle:
         return PGAdapterHandle(self.db.cursor())
 
     def parameters(self) -> Dict[str, str]:
