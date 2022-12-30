@@ -242,9 +242,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def check_json(self, payload: str) -> Optional[dict]:
         is_json = False
-        if payload[-1] == '}':
+        if payload[-1] == "}":
             is_json = True
-        elif payload[-1] == ';' and payload[-2] == '}':
+        elif payload[-1] == ";" and payload[-2] == "}":
             is_json = True
         # Strip any SQL comments
         if is_json:

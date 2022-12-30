@@ -3,6 +3,7 @@ import threading
 
 import duckdb
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 from buenavista.backend.duckdb import DuckDBAdapter
 from buenavista.core import BuenaVistaServer
@@ -23,3 +24,21 @@ def startup():
     bv_thread = threading.Thread(target=app.bv.serve_forever)
     bv_thread.daemon = True
     bv_thread.start()
+
+
+class QueryRequest(BaseModel):
+    sql: str
+
+
+@app.post("/query")
+def query(q: QueryRequest):
+    handle = app.bv.adapter.create_handle()
+    query_result = handle.execute_sql(q.sql)
+    res = {}
+    if query_result.has_results():
+        res["columns"] = [
+            query_result.column(i)[0] for i in range(query_result.column_count())
+        ]
+        res["rows"] = list(query_result.rows())
+    handle.close()
+    return res
