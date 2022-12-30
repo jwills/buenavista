@@ -4,8 +4,8 @@ import threading
 import duckdb
 from fastapi import FastAPI
 
-from buenavista import core
 from buenavista.backend.duckdb import DuckDBAdapter
+from buenavista.core import BuenaVistaServer
 from buenavista.extensions import dbt
 
 app = FastAPI()
@@ -17,7 +17,7 @@ def startup():
         db = duckdb.connect(os.environ["DUCKDB_FILE"])
     else:
         db = duckdb.connect()
-    app.bv = core.BuenaVistaServer(
+    app.bv = BuenaVistaServer(
         ("localhost", 5433), DuckDBAdapter(db), [dbt.DbtPythonRunner()]
     )
     bv_thread = threading.Thread(target=app.bv.serve_forever)
