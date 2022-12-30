@@ -17,7 +17,7 @@ class SimpleQueryResult(QueryResult):
 
     def column(self, index: int) -> Tuple[str, int]:
         if index == 0:
-            return (self.name, PGTypes.TEXT)
+            return (self.name, PGTypes.TEXT.oid)
         else:
             raise IndexError
 
