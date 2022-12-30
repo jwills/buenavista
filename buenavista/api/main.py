@@ -2,11 +2,11 @@ import os
 import threading
 
 import duckdb
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 
 from buenavista import core
 from buenavista.backend.duckdb import DuckDBAdapter
-from buenavista.dbt import runner as dbt_runner
+from buenavista.extensions import dbt
 
 app = FastAPI()
 
@@ -17,32 +17,9 @@ def startup():
         db = duckdb.connect(os.environ["DUCKDB_FILE"])
     else:
         db = duckdb.connect()
-    app.adapter = DuckDBAdapter(db)
-    app.process_status = {}
-    bv = core.BuenaVistaServer(("localhost", 5433), app.adapter)
-    bv_thread = threading.Thread(target=bv.serve_forever)
+    app.bv = core.BuenaVistaServer(
+        ("localhost", 5433), DuckDBAdapter(db), [dbt.DbtPythonRunner()]
+    )
+    bv_thread = threading.Thread(target=app.bv.serve_forever)
     bv_thread.daemon = True
     bv_thread.start()
-
-
-@app.post("/submit_dbt_python_job")
-def submit_dbt_python_job(
-    job: dbt_runner.DbtPythonJob, background_tasks: BackgroundTasks
-):
-    handle = app.adapter.get_handle(job.process_id)
-    if not handle:
-        return {"ok": False, "status": "No handle found for given process ID"}
-    background_tasks.add_task(
-        dbt_runner.run_python_job,
-        job=job,
-        handle=handle,
-        process_status=app.process_status,
-    )
-    res = {"ok": True, "status": "Submitted"}
-    app.process_status[job.process_id] = res
-    return res
-
-
-@app.get("/check_dbt_job_status")
-def check_dbt_job_status(process_id: int):
-    return app.process_status.get(process_id, {"ok": False, "status": "Not Found"})

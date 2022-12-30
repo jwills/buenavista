@@ -1,11 +1,12 @@
 import io
+import json
 import logging
 import os
 import socketserver
 import struct
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-from .adapter import Adapter, AdapterHandle, QueryResult
+from .adapter import Adapter, AdapterHandle, Extension, QueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -240,9 +241,19 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def handle_query(self, ctx: BVContext, payload: bytes):
         logger.debug("Handle query")
-        sql = payload.decode("utf-8").rstrip("\x00")
+        decoded = payload.decode("utf-8").rstrip("\x00")
         try:
-            query_result = ctx.execute_sql(sql)
+            # JSON payloads signal that we should use extensions
+            if decoded[0] == "{" and decoded[-1] == "}":
+                req = json.loads(decoded)
+                ext_type = req.get("ext")
+                extension = self.server.extensions.get(ext_type)
+                if not extension:
+                    raise Exception("Unknown extension: " + str(ext_type))
+                else:
+                    query_result = extension.apply(req, ctx.handle)
+            else:
+                query_result = ctx.execute_sql(decoded)
         except Exception as e:
             self.send_error(e)
             self.send_ready_for_query(ctx)
@@ -468,9 +479,12 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
 
     allow_reuse_address = True
 
-    def __init__(self, server_address, adapter: Adapter):
+    def __init__(
+        self, server_address, adapter: Adapter, extensions: List[Extension] = []
+    ):
         super().__init__(server_address, BuenaVistaHandler)
         self.adapter = adapter
+        self.extensions = {e.type(): e for e in extensions}
 
     def verify_request(self, request, client_address) -> bool:
         """Ensure all requests come from localhost until auth is in place"""

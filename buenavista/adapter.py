@@ -58,3 +58,11 @@ class Adapter:
 
     def parameters(self) -> Dict[str, str]:
         return {}
+
+
+class Extension:
+    def type(self) -> str:
+        raise NotImplementedError
+
+    def apply(self, payload: dict, handle: AdapterHandle) -> QueryResult:
+        raise NotImplementedError
