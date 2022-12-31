@@ -3,6 +3,7 @@ import threading
 
 import duckdb
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from buenavista.backend.duckdb import DuckDBAdapter
@@ -10,7 +11,7 @@ from buenavista.core import BuenaVistaServer
 from buenavista.extensions import dbt
 
 app = FastAPI()
-
+app.mount("/static", StaticFiles(directory=os.path.dirname(__file__) + "/static", html=True), name="static")
 
 @app.on_event("startup")
 def startup():
