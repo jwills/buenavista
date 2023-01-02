@@ -6,7 +6,7 @@
   </head>
   <body>
     <form id="query-form" method="post" action="/query">
-        <textarea name="query" id="query"></textarea>
+        <textarea id="code" name="code"></textarea>
         <button type="submit">Execute Query</button>
     </form>
 
@@ -14,9 +14,8 @@
     </table>
 
     <script>
-      var queryEditor = CodeMirror.fromTextArea(document.getElementById('query'), {
-        mode: 'text/x-mysql',
-        theme: 'monokai',
+      var queryEditor = CodeMirror.fromTextArea(document.getElementById('code'), {
+        mode: 'text/x-sql',
         indentWithTabs: true,
         lineNumbers: true
       });
@@ -26,7 +25,7 @@
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const response = await fetch('/query', {
+        const response = await fetch('/api/query', {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
