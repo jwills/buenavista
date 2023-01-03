@@ -103,25 +103,28 @@ class DuckDBQueryResult(QueryResult):
 class DuckDBAdapterHandle(AdapterHandle):
     def __init__(self, cursor):
         super().__init__()
-        self.cursor = cursor
+        self._cursor = cursor
         self.in_txn = False
         self.refresh_config()
 
+    def cursor(self):
+        return self._cursor
+
     def close(self):
-        self.cursor.close()
+        self._cursor.close()
 
     def refresh_config(self):
         self.config_params = set(
             [
                 r[0]
-                for r in self.cursor.execute(
+                for r in self._cursor.execute(
                     "SELECT name FROM duckdb_settings()"
                 ).fetchall()
             ]
         )
 
     def load_df_function(self, table: str):
-        return self.cursor.query(f"select * from {table}")
+        return self._cursor.query(f"select * from {table}")
 
     def rewrite_sql(self, sql: str) -> str:
         """Some minimalist SQL rewrites, inspired by postlite, to make DBeaver less unhappy."""
@@ -165,9 +168,9 @@ class DuckDBAdapterHandle(AdapterHandle):
         sql = self.rewrite_sql(sql)
         print("Rewritten SQL:", sql)
         if params:
-            self.cursor.execute(sql, params)
+            self._cursor.execute(sql, params)
         else:
-            self.cursor.execute(sql)
+            self._cursor.execute(sql)
 
         rb = None
         if self.cursor.description:

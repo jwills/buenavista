@@ -27,9 +27,10 @@ class DbtPythonRunner(Extension):
             else:
                 raise Exception("Module spec did not include a loader")
             # Do the actual work to run the code here
+            cursor = handle.cursor()
             dbt = module.dbtObj(handle.load_df_function)
-            df = module.model(dbt, handle.cursor)
-            module.materialize(df, handle.cursor)
+            df = module.model(dbt, cursor)
+            module.materialize(df, cursor)
             return SimpleQueryResult("msg", "Success")
         finally:
             os.unlink(mod_file.name)

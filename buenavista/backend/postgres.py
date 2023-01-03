@@ -1,7 +1,9 @@
+import io
 import os
 import re
 from typing import Dict, Iterator, List, Optional, Tuple
 
+import pandas as pd
 import psycopg
 from psycopg_pool import ConnectionPool
 
@@ -41,28 +43,40 @@ class PGAdapterHandle(AdapterHandle):
         super().__init__()
         self.adapter = adapter
         self.conn = conn
+        self._cursor = conn.cursor()
 
     def close(self):
+        self._cursor.close()
         self.adapter.release(self.conn)
         self.conn = None
 
+    def cursor(self):
+        return self._cursor
+
     def execute_sql(self, sql: str, params=None) -> QueryResult:
-        cursor = self.conn.cursor()
         if params:
             sql = re.sub(r"\$\d+", r"%s", sql)
-            cursor.execute(sql, params)
+            self._cursor.execute(sql, params)
         else:
-            cursor.execute(sql)
-        if cursor.description:
-            rows = cursor.fetchall()
-            res = self.to_query_result(cursor.description, rows)
+            self._cursor.execute(sql)
+        if self._cursor.description:
+            rows = self._cursor.fetchall()
+            res = self.to_query_result(self._cursor.description, rows)
         else:
             res = PGQueryResult([], [])
-        cursor.close()
         return res
 
     def in_transaction(self) -> bool:
         return self.conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
+
+    def load_df_function(self, table: str):
+        copy_query = f"COPY {table} TO STDOUT WITH CSV DELIMITER ',' HEADER"
+        out = io.StringIO()
+        with self._cursor.copy(copy_query) as copy:
+            while data := copy.read():
+                out.write(str(data, "utf8"))
+        out.seek(0)
+        return pd.read_csv(out)
 
     def to_query_result(self, description, rows) -> QueryResult:
         fields = []

@@ -23,6 +23,9 @@ class AdapterHandle:
         self.process_id = random.randint(0, 2**31 - 1)
         self.secret_key = random.randint(0, 2**31 - 1)
 
+    def cursor():
+        raise NotImplementedError
+
     def close(self):
         raise NotImplementedError
 
