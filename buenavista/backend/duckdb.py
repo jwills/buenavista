@@ -102,6 +102,7 @@ class DuckDBQueryResult(QueryResult):
 
 class DuckDBAdapterHandle(AdapterHandle):
     def __init__(self, cursor):
+        super().__init__()
         self.cursor = cursor
         self.in_txn = False
         self.refresh_config()

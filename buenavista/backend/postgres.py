@@ -62,7 +62,7 @@ class PGAdapterHandle(AdapterHandle):
         return res
 
     def in_transaction(self) -> bool:
-        return self.conn.status == psycopg.extensions.STATUS_IN_TRANSACTION
+        return self.conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
 
     def to_query_result(self, description, rows) -> QueryResult:
         fields = []
@@ -79,7 +79,9 @@ class PGAdapter(Adapter):
         self.pool = ConnectionPool(psycopg.conninfo.make_conninfo(conninfo, **kwargs))
 
     def new_handle(self) -> AdapterHandle:
-        return PGAdapterHandle(self, self.pool.getconn())
+        conn = self.pool.getconn()
+        conn.autocommit = True
+        return PGAdapterHandle(self, conn)
 
     def release(self, conn):
         self.pool.putconn(conn)
