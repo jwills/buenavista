@@ -29,6 +29,6 @@ setup(
     extras_require={
         "api": ["fastapi"],
         "duckdb": ["duckdb", "pyarrow"],
-        "pg8000": ["pg8000"],
+        "postgres": ["psycopg2-binary"],
     },
 )

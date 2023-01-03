@@ -1,7 +1,8 @@
 import os
+import re
 from typing import Dict, Iterator, List, Optional, Tuple
 
-import pg8000.dbapi
+import psycopg2
 
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 from buenavista.types import PGType
@@ -26,16 +27,15 @@ class PGQueryResult(QueryResult):
 
     def rows(self) -> Iterator[List[Optional[str]]]:
         def t(row):
-            return [self.fields[i][1].converter(v) for i, v in enumerate(row)]
+            return [v if v is None else self.fields[i][1].converter(v) for i, v in enumerate(row)]
 
         return iter(map(t, self._rows))
 
 
 class PGAdapterHandle(AdapterHandle):
     def execute_sql(self, sql: str, params=None) -> QueryResult:
-        if "$" in sql:
-            sql = sql.replace("$", ":")
         if params:
+            sql = re.sub(r"\$\d+", r"%s", sql)
             self.cursor.execute(sql, params)
         else:
             self.cursor.execute(sql)
@@ -55,12 +55,9 @@ class PGAdapterHandle(AdapterHandle):
 
 
 class PGAdapter(Adapter):
-    pg8000.dbapi.paramstyle = "numeric"
-
     def __init__(self, **kwargs):
         super().__init__()
-        self.db = pg8000.dbapi.connect(**kwargs)
-        self.db.autocommit = True
+        self.db = psycopg2.connect(**kwargs)
 
     def new_handle(self) -> AdapterHandle:
         return PGAdapterHandle(self.db.cursor())
