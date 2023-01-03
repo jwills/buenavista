@@ -102,9 +102,12 @@ class DuckDBQueryResult(QueryResult):
 
 class DuckDBAdapterHandle(AdapterHandle):
     def __init__(self, cursor):
-        super().__init__(cursor)
+        self.cursor = cursor
         self.in_txn = False
         self.refresh_config()
+
+    def close(self):
+        self.cursor.close()
 
     def refresh_config(self):
         self.config_params = set(
@@ -141,6 +144,9 @@ class DuckDBAdapterHandle(AdapterHandle):
                 "pg_get_expr(ad.adbin, ad.adrelid)",
             )
         return sql
+
+    def in_transaction(self) -> bool:
+        return self.in_txn
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
         lsql = sql.lower()

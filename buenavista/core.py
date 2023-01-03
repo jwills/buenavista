@@ -35,6 +35,12 @@ class ServerResponse:
     ROW_DESCRIPTION = b"T"
 
 
+class TransactionStatus:
+    IDLE = b"I"
+    IN_TRANSACTION = b"T"
+    IN_FAILED_TRANSACTION = b"E"
+
+
 # Client commands
 class ClientCommand:
     """Byte codes for client commands in the PG wire protocol."""
@@ -117,8 +123,12 @@ class BVContext:
         self.has_error = True
 
     def transaction_status(self):
-        # TODO: Implement me
-        return ServerResponse.EMPTY_QUERY_RESPONSE
+        if self.handle.in_transaction():
+            if self.has_error:
+                return TransactionStatus.IN_FAILED_TRANSACTION
+            else:
+                return TransactionStatus.IN_TRANSACTION
+        return TransactionStatus.IDLE
 
     def execute_sql(self, sql: str) -> QueryResult:
         return self.handle.execute_sql(sql)
@@ -453,9 +463,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def send_ready_for_query(self, ctx: Optional[BVContext]):
         logger.debug("Sending ready for query")
-        status = (
-            ctx.transaction_status() if ctx else ServerResponse.EMPTY_QUERY_RESPONSE
-        )
+        status = ctx.transaction_status() if ctx else TransactionStatus.IDLE
         self.wfile.write(struct.pack("!cic", ServerResponse.READY_FOR_QUERY, 5, status))
 
     def send_parameter_status(self, params: Dict[str, str]):

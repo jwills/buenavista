@@ -2,7 +2,8 @@ import os
 import re
 from typing import Dict, Iterator, List, Optional, Tuple
 
-import psycopg2
+import psycopg
+from psycopg_pool import ConnectionPool
 
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 from buenavista.types import PGType
@@ -27,23 +28,41 @@ class PGQueryResult(QueryResult):
 
     def rows(self) -> Iterator[List[Optional[str]]]:
         def t(row):
-            return [v if v is None else self.fields[i][1].converter(v) for i, v in enumerate(row)]
+            return [
+                v if v is None else self.fields[i][1].converter(v)
+                for i, v in enumerate(row)
+            ]
 
         return iter(map(t, self._rows))
 
 
 class PGAdapterHandle(AdapterHandle):
+    def __init__(self, adapter, conn):
+        super().__init__()
+        self.adapter = adapter
+        self.conn = conn
+
+    def close(self):
+        self.adapter.release(self.conn)
+        self.conn = None
+
     def execute_sql(self, sql: str, params=None) -> QueryResult:
+        cursor = self.conn.cursor()
         if params:
             sql = re.sub(r"\$\d+", r"%s", sql)
-            self.cursor.execute(sql, params)
+            cursor.execute(sql, params)
         else:
-            self.cursor.execute(sql)
-        if self.cursor.description:
-            rows = self.cursor.fetchall()
-            return self.to_query_result(self.cursor.description, rows)
+            cursor.execute(sql)
+        if cursor.description:
+            rows = cursor.fetchall()
+            res = self.to_query_result(cursor.description, rows)
         else:
-            return PGQueryResult([], [])
+            res = PGQueryResult([], [])
+        cursor.close()
+        return res
+
+    def in_transaction(self) -> bool:
+        return self.conn.status == psycopg.extensions.STATUS_IN_TRANSACTION
 
     def to_query_result(self, description, rows) -> QueryResult:
         fields = []
@@ -55,15 +74,18 @@ class PGAdapterHandle(AdapterHandle):
 
 
 class PGAdapter(Adapter):
-    def __init__(self, **kwargs):
+    def __init__(self, conninfo="", **kwargs):
         super().__init__()
-        self.db = psycopg2.connect(**kwargs)
+        self.pool = ConnectionPool(psycopg.conninfo.make_conninfo(conninfo, **kwargs))
 
     def new_handle(self) -> AdapterHandle:
-        return PGAdapterHandle(self.db.cursor())
+        return PGAdapterHandle(self, self.pool.getconn())
+
+    def release(self, conn):
+        self.pool.putconn(conn)
 
     def parameters(self) -> Dict[str, str]:
-        return {"server_version": "BV.pg8000.1", "client_encoding": "UTF8"}
+        return {"server_version": "BV.psycopg2.1", "client_encoding": "UTF8"}
 
 
 if __name__ == "__main__":
@@ -74,7 +96,11 @@ if __name__ == "__main__":
     server = BuenaVistaServer(
         address,
         PGAdapter(
-            host="localhost", port=5432, user=os.getenv("USER"), database="postgres"
+            conninfo="",
+            host="localhost",
+            port=5432,
+            user=os.getenv("USER"),
+            dbname="postgres",
         ),
         extensions=[DbtPythonRunner()],
     )

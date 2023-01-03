@@ -19,15 +19,17 @@ class QueryResult:
 
 
 class AdapterHandle:
-    def __init__(self, cursor):
-        self.cursor = cursor
+    def __init__(self):
         self.process_id = random.randint(0, 2**31 - 1)
         self.secret_key = random.randint(0, 2**31 - 1)
 
     def close(self):
-        self.cursor.close()
+        raise NotImplementedError
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
+        raise NotImplementedError
+
+    def in_transaction(self) -> bool:
         raise NotImplementedError
 
     def load_df_function(self, table: str):

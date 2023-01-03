@@ -5,8 +5,9 @@ import duckdb
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
 # Use this to serve a public/index.html
-from starlette.responses import FileResponse 
+from starlette.responses import FileResponse
 
 from buenavista.backend.duckdb import DuckDBAdapter
 from buenavista.core import BuenaVistaServer
@@ -43,6 +44,7 @@ def index():
 
 class QueryRequest(BaseModel):
     sql: str
+
 
 @app.post("/api/query")
 def query(q: QueryRequest):
