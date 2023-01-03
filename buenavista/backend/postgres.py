@@ -68,6 +68,7 @@ class PGAdapter(Adapter):
 
 if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
+    from buenavista.extensions.dbt import DbtPythonRunner
 
     address = ("localhost", 5433)
     server = BuenaVistaServer(
@@ -75,6 +76,7 @@ if __name__ == "__main__":
         PGAdapter(
             host="localhost", port=5432, user=os.getenv("USER"), database="postgres"
         ),
+        extensions=[DbtPythonRunner()],
     )
     ip, port = server.server_address
     print("Listening on {ip}:{port}".format(ip=ip, port=port))
