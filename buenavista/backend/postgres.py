@@ -87,7 +87,7 @@ class PGAdapter(Adapter):
         self.pool.putconn(conn)
 
     def parameters(self) -> Dict[str, str]:
-        return {"server_version": "BV.psycopg2.1", "client_encoding": "UTF8"}
+        return {"server_version": "BV.psycopg.1", "client_encoding": "UTF8"}
 
 
 if __name__ == "__main__":
