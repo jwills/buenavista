@@ -173,14 +173,14 @@ class DuckDBAdapterHandle(AdapterHandle):
             self._cursor.execute(sql)
 
         rb = None
-        if self.cursor.description:
+        if self._cursor.description:
             if (
                 "select" in lsql
                 or "with" in lsql
                 or "describe" in lsql
                 or "show" in lsql
             ):
-                rb = self.cursor.fetch_record_batch()
+                rb = self._cursor.fetch_record_batch()
             elif "load " in lsql:
                 self.refresh_config()
         return DuckDBQueryResult(rb)
