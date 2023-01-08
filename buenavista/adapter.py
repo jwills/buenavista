@@ -1,5 +1,7 @@
 import random
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+from .types import PGType
 
 
 class QueryResult:
@@ -71,3 +73,25 @@ class Extension:
 
     def apply(self, payload: dict, handle: AdapterHandle) -> QueryResult:
         raise NotImplementedError
+
+
+class SimpleQueryResult(QueryResult):
+    def __init__(self, name: str, value: Any, type: PGType):
+        self.name = name
+        self.value = str(value)
+        self.type = type
+
+    def has_results(self):
+        return True
+
+    def column_count(self):
+        return 1
+
+    def column(self, index: int) -> Tuple[str, int]:
+        if index == 0:
+            return (self.name, self.type.oid)
+        else:
+            raise IndexError
+
+    def rows(self) -> Iterator[List[Optional[str]]]:
+        return iter([self.value])
