@@ -27,7 +27,6 @@ setup(
     packages=find_namespace_packages(include=["buenavista", "buenavista.*"]),
     include_package_data=True,
     extras_require={
-        "api": ["fastapi"],
         "duckdb": ["duckdb", "pyarrow"],
         "postgres": ["psycopg", "psycopg-pool"],
     },
