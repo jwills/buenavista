@@ -14,7 +14,7 @@ that illustrates the idea locally:
 ```
 git clone https://github.com/jwills/buenavista.git
 pip3 install .
-python3 -m buenavista.backend.duckdb <optional_duckdb_file>
+python3 -m buenavista.backends.duckdb <optional_duckdb_file>
 ```
 
 in order to start a Postgres server on `localhost:5433` backed by the DuckDB database file that you passed in at the command line
