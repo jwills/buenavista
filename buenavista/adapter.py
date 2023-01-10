@@ -71,7 +71,7 @@ class Extension:
     def type(self) -> str:
         raise NotImplementedError
 
-    def apply(self, payload: dict, handle: AdapterHandle) -> QueryResult:
+    def apply(self, params: dict, handle: AdapterHandle) -> QueryResult:
         raise NotImplementedError
 
 

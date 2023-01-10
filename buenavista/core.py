@@ -268,12 +268,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         try:
             # JSON payloads signal that we should use extensions
             if req := self.check_json(decoded):
-                ext_type = req.get("ext")
-                extension = self.server.extensions.get(ext_type)
+                method = req.get("method")
+                extension = self.server.extensions.get(method)
                 if not extension:
-                    raise Exception("Unknown extension: " + str(ext_type))
+                    raise Exception("Unknown method: " + str(method))
                 else:
-                    query_result = extension.apply(req, ctx.handle)
+                    query_result = extension.apply(req.get("params"), ctx.handle)
             else:
                 query_result = ctx.execute_sql(decoded)
         except Exception as e:
