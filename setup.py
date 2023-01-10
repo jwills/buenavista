@@ -24,7 +24,7 @@ setup(
     author_email="joshwills+bv@gmail.com",
     url="https://github.com/jwills/buenavista",
     license="Apache",
-    packages=["buenavista"],
+    packages=find_namespace_packages(include=["buenavista", "buenavista.*"]),
     include_package_data=True,
     extras_require={
         "api": ["fastapi"],
