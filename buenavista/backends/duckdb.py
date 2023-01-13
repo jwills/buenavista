@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -6,6 +7,9 @@ import pyarrow as pa
 
 from buenavista.adapter import Adapter, AdapterHandle, QueryResult
 from buenavista.types import PGType, PGTypes
+
+
+logger = logging.getLogger(__name__)
 
 
 def pg_type(t: pa.DataType) -> PGType:
@@ -164,9 +168,9 @@ class DuckDBAdapterHandle(AdapterHandle):
         elif "begin" in lsql:
             self.in_txn = True
 
-        print("Original SQL:", sql)
+        logger.debug("Original SQL: %s", sql)
         sql = self.rewrite_sql(sql)
-        print("Rewritten SQL:", sql)
+        logger.debug("Rewritten SQL: %s", sql)
         if params:
             self._cursor.execute(sql, params)
         else:
