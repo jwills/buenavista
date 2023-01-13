@@ -22,4 +22,4 @@ RUN python setup.py install
 EXPOSE 5433
 
 ENTRYPOINT ["/tini", "--"]
-CMD python -m buenavista.backend.duckdb
+CMD python -m buenavista.backends.duckdb
