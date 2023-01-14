@@ -11,9 +11,8 @@ may only be open by a single process at a time. The Buena Vista library makes it
 from multiple different processes over the Postgres wire protocol, and the library makes it simple enough to run an example
 that illustrates the idea locally:
 
-```
-git clone https://github.com/jwills/buenavista.git
-pip3 install .
+```sh
+pip3 install buenavista
 python3 -m buenavista.backends.duckdb <optional_duckdb_file>
 ```
 
