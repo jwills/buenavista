@@ -142,6 +142,8 @@ class DuckDBAdapterHandle(AdapterHandle):
             return "SELECT 'public' as search_path"
         elif sql == "SHOW TRANSACTION ISOLATION LEVEL":
             return "SELECT 'read committed' as transaction_isolation"
+        elif sql == "BEGIN READ ONLY":
+            return "BEGIN"
         elif "::regclass" in sql:
             return sql.replace("::regclass", "")
         elif "::regtype" in sql:
@@ -218,7 +220,7 @@ class DuckDBAdapter(Adapter):
 
     def parameters(self) -> Dict[str, str]:
         return {
-            "server_version": "postduck.0.6",
+            "server_version": "9.3.duckdb",
             "client_encoding": "UTF8",
             "DateStyle": "ISO",
         }
@@ -231,11 +233,13 @@ if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
     import sys
 
+    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
+
     if len(sys.argv) < 2:
         print("Using in-memory DuckDB database")
         db = duckdb.connect()
     else:
-        print("Using DuckDB database at", sys.argv[1])
+        logger.info("Using DuckDB database at %s", sys.argv[1])
         db = duckdb.connect(sys.argv[1])
 
     bv_host = "0.0.0.0"
@@ -251,7 +255,7 @@ if __name__ == "__main__":
 
     server = BuenaVistaServer(address, DuckDBAdapter(db))
     ip, port = server.server_address
-    print("Listening on {ip}:{port}".format(ip=ip, port=port))
+    logger.info("Listening on {ip}:{port}".format(ip=ip, port=port))
 
     try:
         server.serve_forever()
