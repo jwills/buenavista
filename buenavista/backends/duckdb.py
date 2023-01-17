@@ -153,6 +153,8 @@ class DuckDBAdapterHandle(AdapterHandle):
                 "pg_get_expr(ad.adbin, ad.adrelid, true)",
                 "pg_get_expr(ad.adbin, ad.adrelid)",
             )
+        elif "pg_catalog.current_schemas" in sql:
+            return sql.replace("pg_catalog.current_schemas", "current_schemas")
         return sql
 
     def in_transaction(self) -> bool:
