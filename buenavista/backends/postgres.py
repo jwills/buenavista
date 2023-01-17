@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import re
 from typing import Dict, Iterator, List, Optional, Tuple
@@ -101,12 +102,13 @@ class PGAdapter(Adapter):
         self.pool.putconn(conn)
 
     def parameters(self) -> Dict[str, str]:
-        return {"server_version": "BV.psycopg.1", "client_encoding": "UTF8"}
+        return {"server_version": "9.3.bvproxy", "client_encoding": "UTF8"}
 
 
 if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
-    from buenavista.extensions.dbt import DbtPythonRunner
+
+    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
 
     address = ("localhost", 5433)
     server = BuenaVistaServer(
@@ -118,8 +120,7 @@ if __name__ == "__main__":
             user=os.getenv("USER"),
             dbname="postgres",
         ),
-        extensions=[DbtPythonRunner()],
     )
     ip, port = server.server_address
-    print("Listening on {ip}:{port}".format(ip=ip, port=port))
+    logging.info("Listening on {ip}:{port}".format(ip=ip, port=port))
     server.serve_forever()

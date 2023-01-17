@@ -296,6 +296,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         stmt = ba[:stmt_idx].decode("utf-8")
         query_idx = ba.index(NULL_BYTE, stmt_idx + 1)
         sql = ba[stmt_idx + 1 : query_idx].decode("utf-8")
+        logger.debug("Parsed statement: %s", sql)
         ctx.add_statement(stmt, sql)
         self.send_parse_complete()
 
@@ -358,7 +359,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 return
         else:
             raise Exception(f"Unknown describe type: {describe_type}")
-        self.send_row_description(query_result)
+        if query_result.has_results():
+            self.send_row_description(query_result)
 
     def handle_execute(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling execute")
@@ -375,8 +377,11 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         except Exception as e:
             self.send_error(e, ctx)
             return
-        row_count = self.send_data_rows(query_result, limit)
-        self.send_command_complete("SELECT %d\x00" % row_count)
+        if query_result.has_results():
+            row_count = self.send_data_rows(query_result, limit)
+            self.send_command_complete("SELECT %d\x00" % row_count)
+        else:
+            self.send_command_complete("\x00")
 
     def handle_close(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling close")
