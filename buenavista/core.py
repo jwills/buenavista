@@ -286,7 +286,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             row_count = self.send_data_rows(query_result)
             self.send_command_complete("SELECT %d\x00" % row_count)
         else:
-            self.send_command_complete("\x00")
+            status = query_result.status()
+            self.send_command_complete(f"{status}\x00")
         self.send_ready_for_query(ctx)
 
     def handle_parse(self, ctx: BVContext, payload: bytes):
@@ -381,7 +382,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             row_count = self.send_data_rows(query_result, limit)
             self.send_command_complete("SELECT %d\x00" % row_count)
         else:
-            self.send_command_complete("\x00")
+            status = query_result.status()
+            self.send_command_complete(f"{status}\x00")
 
     def handle_close(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling close")
