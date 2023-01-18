@@ -14,6 +14,19 @@ To get an interactive psql shell, use for example:
 
 		docker run --network host -it --rm postgres:latest psql -h $(hostname) -p 8080
 
+### Using duckdb to read parquet and sqlite3 formats
+
+First download some example data using the `download_data.sh` script:
+
+		# put example data files in the ./data directory first
+		./download_data.sh
+
+		# this command mounts the data directory inside the container's /data directory
+		docker run -it --rm -p 8080:5433 -e BUENAVISTA_HOST=0.0.0.0 -e BUENAVISTA_PORT=5433 -v $(pwd)/data:/data ghcr.io/jwills/buenavista
+
+		# start the psql shell
+		docker run --network host -it --rm postgres:latest psql -h $(hostname) -p 8080
+
 In the psql shell, commands that use duckdb's parquet and sqlite scanners can be used:
 		
 		# example of statements to try in the psql shell
@@ -25,9 +38,9 @@ In the psql shell, commands that use duckdb's parquet and sqlite scanners can be
 		
 		select * from parquet_scan('/data/iris.parquet');
 		
-		call sqlite_attach('/data/sakila.db');
+		call sqlite_attach('/data/chinook.db');
 		show tables;	
-		
+
 ## Local build 
 
 To build a container image and use the services locally, clone the repo, and use the Makefile target "build" when in the docker directory:

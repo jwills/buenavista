@@ -5,3 +5,6 @@ build:
 
 up:
 	docker-compose up -d
+
+example-data:
+	@./download_data.sh
