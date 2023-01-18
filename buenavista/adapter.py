@@ -19,6 +19,9 @@ class QueryResult:
     def rows(self) -> Iterator[List[Optional[str]]]:
         raise NotImplementedError
 
+    def status(self) -> str:
+        raise NotImplementedError
+
 
 class AdapterHandle:
     def __init__(self):
@@ -95,3 +98,6 @@ class SimpleQueryResult(QueryResult):
 
     def rows(self) -> Iterator[List[Optional[str]]]:
         return iter([self.value])
+
+    def status(self) -> str:
+        return ""

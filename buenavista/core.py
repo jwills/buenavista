@@ -387,9 +387,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Handling close")
         close_type = payload[0]
         if close_type == ord("S"):
-            ctx.close_statement(payload[1:].decode("utf-8"))
+            ctx.close_statement(payload[1:-1].decode("utf-8"))
         elif close_type == ord("P"):
-            ctx.close_portal(payload[1:].decode("utf-8"))
+            ctx.close_portal(payload[1:-1].decode("utf-8"))
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()

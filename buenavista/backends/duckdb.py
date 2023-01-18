@@ -73,13 +73,16 @@ class RecordBatchIterator(Iterator[List[Optional[str]]]):
 
 
 class DuckDBQueryResult(QueryResult):
-    def __init__(self, rbr: Optional[pa.RecordBatchReader] = None):
+    def __init__(
+        self, rbr: Optional[pa.RecordBatchReader] = None, status: Optional[str] = None
+    ):
         if rbr:
             self.rbr = rbr
             self.pg_types = [pg_type(s.type) for s in rbr.schema]
         else:
             self.rbr = None
             self.pg_types = []
+        self._status = status
 
     def has_results(self) -> bool:
         return self.rbr is not None
@@ -102,6 +105,9 @@ class DuckDBQueryResult(QueryResult):
             return RecordBatchIterator(self.rbr, self.pg_types)
         else:
             return iter([])
+
+    def status(self) -> str:
+        return self._status
 
 
 class DuckDBAdapterHandle(AdapterHandle):
@@ -139,15 +145,22 @@ class DuckDBAdapterHandle(AdapterHandle):
             else:
                 return ""
         if sql == "SHOW search_path":
-            return "SELECT 'public' as search_path"
+            return "SELECT current_setting('search_path') as search_path"
         elif sql == "SHOW TRANSACTION ISOLATION LEVEL":
             return "SELECT 'read committed' as transaction_isolation"
         elif sql == "BEGIN READ ONLY":
             return "BEGIN"
+        elif (
+            sql
+            == "SELECT setting FROM pg_catalog.pg_settings WHERE name='max_index_keys'"
+        ):
+            return "SELECT 32 as setting"
         elif "::regclass" in sql:
             return sql.replace("::regclass", "")
         elif "::regtype" in sql:
             return sql.replace("::regtype", "")
+        elif "::regproc" in sql:
+            return sql.replace("::regproc", "")
         elif "pg_get_expr(ad.adbin, ad.adrelid, true)" in sql:
             return sql.replace(
                 "pg_get_expr(ad.adbin, ad.adrelid, true)",
@@ -155,22 +168,28 @@ class DuckDBAdapterHandle(AdapterHandle):
             )
         elif "pg_catalog.current_schemas" in sql:
             return sql.replace("pg_catalog.current_schemas", "current_schemas")
+        elif "pg_catalog.generate_series" in sql:
+            return sql.replace("pg_catalog.generate_series", "generate_series")
         return sql
 
     def in_transaction(self) -> bool:
         return self.in_txn
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
+        status = ""
         lsql = sql.lower()
         if self.in_txn:
             if "commit" in lsql:
                 self.in_txn = False
+                status = "COMMIT"
             elif "rollback" in lsql:
                 self.in_txn = False
+                status = "ROLLBACK"
             elif "begin" in lsql:
-                return DuckDBQueryResult()
+                return DuckDBQueryResult(status="BEGIN")
         elif "begin" in lsql:
             self.in_txn = True
+            status = "BEGIN"
 
         logger.debug("Original SQL: %s", sql)
         sql = self.rewrite_sql(sql)
@@ -191,7 +210,8 @@ class DuckDBAdapterHandle(AdapterHandle):
                 rb = self._cursor.fetch_record_batch()
             elif "load " in lsql:
                 self.refresh_config()
-        return DuckDBQueryResult(rb)
+                status = "LOAD"
+        return DuckDBQueryResult(rb, status)
 
 
 class DuckDBAdapter(Adapter):
@@ -219,6 +239,12 @@ class DuckDBAdapter(Adapter):
         self.db.execute(
             "CREATE OR REPLACE FUNCTION pg_catalog.pg_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
         )
+        self.db.execute(
+            "CREATE OR REPLACE FUNCTION array_upper(arr, index) AS (CASE WHEN index = 1 THEN len(arr) WHEN index = 2 THEN len(arr[1]) END)"
+        )
+        self.db.execute(
+            "CREATE OR REPLACE FUNCTION to_char(expression, format) AS CAST(expression as VARCHAR)"
+        )
 
     def parameters(self) -> Dict[str, str]:
         return {
@@ -228,14 +254,18 @@ class DuckDBAdapter(Adapter):
         }
 
     def new_handle(self) -> AdapterHandle:
-        return DuckDBAdapterHandle(self.db.cursor())
+        cursor = self.db.cursor()
+        cursor.execute("SET search_path='main'")
+        return DuckDBAdapterHandle(cursor)
 
 
 if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
     import sys
 
-    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
+    logging.basicConfig(
+        format="%(thread)d: %(message)s", level=logging.DEBUG
+    )
 
     if len(sys.argv) < 2:
         print("Using in-memory DuckDB database")
