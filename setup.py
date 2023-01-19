@@ -29,5 +29,6 @@ setup(
     extras_require={
         "duckdb": ["duckdb", "pyarrow"],
         "postgres": ["psycopg", "psycopg-pool"],
+        "prql": ["prql-python"],
     },
 )

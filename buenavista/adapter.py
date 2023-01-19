@@ -24,11 +24,13 @@ class QueryResult:
 
 
 class AdapterHandle:
+    """This is essentially a wrapper for a Python DB API 2.0 Cursor and it should just be that"""
+
     def __init__(self):
         self.process_id = random.randint(0, 2**31 - 1)
         self.secret_key = random.randint(0, 2**31 - 1)
 
-    def cursor():
+    def cursor(self):
         raise NotImplementedError
 
     def close(self):
