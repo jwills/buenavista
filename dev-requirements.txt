@@ -1,4 +1,5 @@
 duckdb
+fastapi[all]
 psycopg
 psycopg-pool
 pyarrow

@@ -25,9 +25,8 @@ class PGQueryResult(QueryResult):
     def column_count(self):
         return len(self.fields)
 
-    def column(self, index: int) -> Tuple[str, int]:
-        field = self.fields[index]
-        return (field[0], field[1].oid)
+    def column(self, index: int) -> Tuple[str, PGType]:
+        return self.fields[index]
 
     def rows(self) -> Iterator[List[Optional[str]]]:
         def t(row):

@@ -13,7 +13,7 @@ class QueryResult:
     def column_count(self):
         raise NotImplementedError
 
-    def column(self, index: int) -> Tuple[str, int]:
+    def column(self, index: int) -> Tuple[str, PGType]:
         raise NotImplementedError
 
     def rows(self) -> Iterator[List[Optional[str]]]:

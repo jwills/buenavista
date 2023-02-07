@@ -93,10 +93,10 @@ class DuckDBQueryResult(QueryResult):
         else:
             return 0
 
-    def column(self, index: int) -> Tuple[str, int]:
+    def column(self, index: int) -> Tuple[str, PGType]:
         if self.rbr:
             s = self.rbr.schema[index]
-            return s.name, self.pg_types[index].oid
+            return s.name, self.pg_types[index]
         else:
             raise IndexError("No column at index %d" % index)
 
@@ -263,9 +263,7 @@ if __name__ == "__main__":
     from buenavista.core import BuenaVistaServer
     import sys
 
-    logging.basicConfig(
-        format="%(thread)d: %(message)s", level=logging.DEBUG
-    )
+    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.DEBUG)
 
     if len(sys.argv) < 2:
         print("Using in-memory DuckDB database")

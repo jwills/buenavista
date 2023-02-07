@@ -400,9 +400,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
         for i in range(query_result.column_count()):
-            name, oid = query_result.column(i)
+            name, pgtype = query_result.column(i)
             buf.write_string(name)
-            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, 0))
+            buf.write_bytes(struct.pack("!ihihih", 0, 0, pgtype.oid, 0, -1, 0))
         out = buf.get_value()
         sig = struct.pack(
             "!cih",
