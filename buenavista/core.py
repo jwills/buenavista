@@ -416,11 +416,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         cnt = 0
         for row in query_result.rows():
             buf = BVBuffer()
-            for r in row:
+            for i, r in enumerate(row):
                 if r is None:
                     buf.write_int32(-1)
                 else:
-                    v = r.encode("utf-8")
+                    # TODO: hard-coded text conversion, look into fixing this
+                    v = query_result.column(i).convert(r).encode("utf-8")
                     buf.write_int32(len(v))
                     buf.write_bytes(v)
             out = buf.get_value()

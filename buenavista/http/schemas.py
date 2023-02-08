@@ -14,10 +14,6 @@ class CamelModel(BaseModel):
         alias_generator = camel_case
         allow_population_by_field_name = True
 
-    # def dict(self, *args, **kwargs) -> Dict[str, Any]:
-    #    #_ignored = kwargs.pop('exclude_none')
-    #    return super().dict(*args, exclude_none=True, **kwargs)
-
 
 class Column(CamelModel):
     name: str

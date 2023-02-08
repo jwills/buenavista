@@ -16,7 +16,7 @@ class QueryResult:
     def column(self, index: int) -> Tuple[str, PGType]:
         raise NotImplementedError
 
-    def rows(self) -> Iterator[List[Optional[str]]]:
+    def rows(self) -> Iterator[List]:
         raise NotImplementedError
 
     def status(self) -> str:

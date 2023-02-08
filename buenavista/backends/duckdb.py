@@ -55,19 +55,15 @@ class RecordBatchIterator(Iterator[List[Optional[str]]]):
         self.i = 0
         return self
 
-    def __next__(self) -> List[Optional[str]]:
+    def __next__(self) -> List:
         if self.rb is None:
             raise StopIteration
         if self.i >= self.rb.num_rows:
             self.rb = self.rbr.read_next_batch()
             self.i = 0
         ret = []
-        for j, col in enumerate(self.rb.columns):
-            pv = col[self.i].as_py()
-            if pv is None:
-                ret.append(pv)
-            else:
-                ret.append(self.pg_types[j].converter(pv))
+        for col in self.rb.columns:
+            ret.append(col[self.i].as_py())
         self.i += 1
         return ret
 
@@ -100,7 +96,7 @@ class DuckDBQueryResult(QueryResult):
         else:
             raise IndexError("No column at index %d" % index)
 
-    def rows(self) -> Iterator[List[Optional[str]]]:
+    def rows(self) -> Iterator[List]:
         if self.rbr:
             return RecordBatchIterator(self.rbr, self.pg_types)
         else:

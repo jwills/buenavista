@@ -28,7 +28,7 @@ class PGQueryResult(QueryResult):
     def column(self, index: int) -> Tuple[str, PGType]:
         return self.fields[index]
 
-    def rows(self) -> Iterator[List[Optional[str]]]:
+    def rows(self) -> Iterator[List]:
         def t(row):
             return [
                 v if v is None else self.fields[i][1].converter(v)

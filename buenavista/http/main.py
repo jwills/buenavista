@@ -44,21 +44,32 @@ async def statement(req: Request, query: str = Body(...)) -> Response:
 def _execute(h: AdapterHandle, query: bytes) -> schemas.QueryResults:
     start = round(time.time() * 1000)
     id = f"{h.process_id}-{start}"
-    print("Executing " + query)
-    qr = h.execute_sql(query)
-    elapsed = round(time.time() * 1000) - start
-    return schemas.QueryResults(
-        id=id,
-        info_uri="http://127.0.0.1/info",
-        columns=_to_columns(qr),
-        data=list([[int(x) for x in r] for r in qr.rows()]),
-        stats=schemas.StatementStats(
-            state="COMPLETE",
-            elapsed_time_millis=elapsed,
-            root_stage=None,
-            runtime_stats=None,
-        ),
-    )
+    try:
+        qr = h.execute_sql(query)
+        return schemas.QueryResults(
+            id=id,
+            info_uri="http://127.0.0.1/info",
+            columns=_to_columns(qr),
+            data=list(qr.rows()),
+            stats=schemas.StatementStats(
+                state="COMPLETE",
+                elapsed_time_millis=(round(time.time() * 1000) - start),
+            ),
+        )
+    except Exception as e:
+        return schemas.QueryResults(
+            id=id,
+            info_uri="http://127.0.0.1/info",
+            error=schemas.QueryError(
+                message=str(e),
+                error_code=-1,
+                retriable=False,
+            ),
+            stats=schemas.StatementStats(
+                state="ERROR",
+                elapsed_time_millis=(round(time.time() * 1000) - start),
+            ),
+        )
 
 
 def _to_columns(qr: QueryResult) -> List[schemas.Column]:
