@@ -11,33 +11,45 @@ from fastapi.responses import JSONResponse
 
 from . import schemas
 from ..core import Session, QueryResult
-from ..backends.duckdb import DuckDBAdapter
+from ..backends.duckdb import DuckDBConnection
 
 app = FastAPI()
 
 
 @app.on_event("startup")
 def startup():
-    app.adapter = DuckDBAdapter(duckdb.connect())
+    # TODO: generalize this config here
+    app.conn = DuckDBConnection(duckdb.connect())
     app.pool = concurrent.futures.ThreadPoolExecutor()
 
 
 @app.on_event("shutdown")
 def shutdown():
-    app.adapter = None
+    app.conn = None
     app.pool = None
+
+
+@app.get("/v1/info")
+async def info():
+    return {
+        "coordinator": {},
+        "workers": [],
+        "memory": {},
+        "jvm": {},
+        "system": {},
+    }
 
 
 @app.post("/v1/statement")
 async def statement(req: Request, query: str = Body(...)) -> Response:
     # user = req.headers["X-Presto-User"]
     # Get/create handle here
-    handle = app.adapter.create_handle()
+    sess = app.conn.create_session()
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(
-        app.pool, functools.partial(_execute, handle, query)
+        app.pool, functools.partial(_execute, sess, query)
     )
-    app.adapter.close_session(handle)
+    app.conn.close_session(sess)
     return JSONResponse(content=jsonable_encoder(result))
 
 
