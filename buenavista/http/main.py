@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from . import schemas
-from ..adapter import AdapterHandle, QueryResult
+from ..core import Session, QueryResult
 from ..backends.duckdb import DuckDBAdapter
 
 app = FastAPI()
@@ -37,11 +37,11 @@ async def statement(req: Request, query: str = Body(...)) -> Response:
     result = await loop.run_in_executor(
         app.pool, functools.partial(_execute, handle, query)
     )
-    app.adapter.close_handle(handle)
+    app.adapter.close_session(handle)
     return JSONResponse(content=jsonable_encoder(result))
 
 
-def _execute(h: AdapterHandle, query: bytes) -> schemas.QueryResults:
+def _execute(h: Session, query: bytes) -> schemas.QueryResults:
     start = round(time.time() * 1000)
     id = f"{h.process_id}-{start}"
     try:

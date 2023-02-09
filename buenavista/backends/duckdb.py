@@ -5,7 +5,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import duckdb
 import pyarrow as pa
 
-from buenavista.adapter import Adapter, AdapterHandle, QueryResult
+from buenavista.core import Connection, QueryResult, Session
 from buenavista.types import PGType, PGTypes
 
 
@@ -106,7 +106,7 @@ class DuckDBQueryResult(QueryResult):
         return self._status
 
 
-class DuckDBAdapterHandle(AdapterHandle):
+class DuckDBSession(Session):
     def __init__(self, cursor):
         super().__init__()
         self._cursor = cursor
@@ -210,7 +210,7 @@ class DuckDBAdapterHandle(AdapterHandle):
         return DuckDBQueryResult(rb, status)
 
 
-class DuckDBAdapter(Adapter):
+class DuckDBConnection(Connection):
     def __init__(self, db):
         super().__init__()
         self.db = db
@@ -249,14 +249,14 @@ class DuckDBAdapter(Adapter):
             "DateStyle": "ISO",
         }
 
-    def new_handle(self) -> AdapterHandle:
+    def new_session(self) -> Session:
         cursor = self.db.cursor()
         cursor.execute("SET search_path='main'")
-        return DuckDBAdapterHandle(cursor)
+        return DuckDBSession(cursor)
 
 
 if __name__ == "__main__":
-    from buenavista.core import BuenaVistaServer
+    from buenavista.postgres import BuenaVistaServer
     import sys
 
     logging.basicConfig(format="%(thread)d: %(message)s", level=logging.DEBUG)
@@ -279,7 +279,7 @@ if __name__ == "__main__":
 
     address = (bv_host, bv_port)
 
-    server = BuenaVistaServer(address, DuckDBAdapter(db))
+    server = BuenaVistaServer(address, DuckDBConnection(db))
     ip, port = server.server_address
     logger.info("Listening on {ip}:{port}".format(ip=ip, port=port))
 

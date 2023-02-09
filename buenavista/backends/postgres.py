@@ -8,7 +8,7 @@ import pandas as pd
 import psycopg
 from psycopg_pool import ConnectionPool
 
-from buenavista.adapter import Adapter, AdapterHandle, QueryResult
+from buenavista.core import Connection, QueryResult, Session
 from buenavista.types import PGType
 
 
@@ -38,16 +38,16 @@ class PGQueryResult(QueryResult):
         return iter(map(t, self._rows))
 
 
-class PGAdapterHandle(AdapterHandle):
-    def __init__(self, adapter, conn):
+class PGSession(Session):
+    def __init__(self, parent, conn):
         super().__init__()
-        self.adapter = adapter
+        self.parent = parent
         self.conn = conn
         self._cursor = conn.cursor()
 
     def close(self):
         self._cursor.close()
-        self.adapter.release(self.conn)
+        self.parent.release(self.conn)
         self.conn = None
 
     def cursor(self):
@@ -87,15 +87,15 @@ class PGAdapterHandle(AdapterHandle):
         return PGQueryResult(fields, rows)
 
 
-class PGAdapter(Adapter):
+class PGConnection(Connection):
     def __init__(self, conninfo="", **kwargs):
         super().__init__()
         self.pool = ConnectionPool(psycopg.conninfo.make_conninfo(conninfo, **kwargs))
 
-    def new_handle(self) -> AdapterHandle:
+    def new_session(self) -> Session:
         conn = self.pool.getconn()
         conn.autocommit = True
-        return PGAdapterHandle(self, conn)
+        return PGSession(self, conn)
 
     def release(self, conn):
         self.pool.putconn(conn)
@@ -105,14 +105,14 @@ class PGAdapter(Adapter):
 
 
 if __name__ == "__main__":
-    from buenavista.core import BuenaVistaServer
+    from buenavista.postgres import BuenaVistaServer
 
     logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
 
     address = ("localhost", 5433)
     server = BuenaVistaServer(
         address,
-        PGAdapter(
+        PGConnection(
             conninfo="",
             host="localhost",
             port=5432,
