@@ -48,7 +48,7 @@ class Connection:
     """Translation layer from an upstream data source into the BV representation of a query result."""
 
     def __init__(self):
-        self._handles = {}
+        self._sessions = {}
 
     def create_session(self) -> Session:
         sess = self.new_session()
@@ -56,11 +56,11 @@ class Connection:
         return sess
 
     def get_session(self, process_id: int) -> Optional[Session]:
-        return self._handles.get(process_id)
+        return self._sessions.get(process_id)
 
     def close_session(self, session: Session):
-        if session and session.process_id in self._handles:
-            del self._handles[session.process_id]
+        if session and session.process_id in self._sessions:
+            del self._sessions[session.process_id]
             session.close()
 
     def new_session(self) -> Session:

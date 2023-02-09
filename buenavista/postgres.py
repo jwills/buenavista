@@ -421,7 +421,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                     buf.write_int32(-1)
                 else:
                     # TODO: hard-coded text conversion, look into fixing this
-                    v = query_result.column(i).convert(r).encode("utf-8")
+                    v = query_result.column(i)[1].convert(r).encode("utf-8")
                     buf.write_int32(len(v))
                     buf.write_bytes(v)
             out = buf.get_value()
