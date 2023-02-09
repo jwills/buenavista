@@ -1,9 +1,11 @@
-from typing import Callable, DecoratedCallable, Dict
+from typing import Any, Callable, Dict, TypeVar
 
 import sqlglot
 import sqlglot.expressions as exp
 
 from .core import Connection, Session, QueryResult
+
+DecoratedCallable = TypeVar("DecoratedCallable", bound=Callable[..., Any])
 
 
 class Rewriter:
@@ -76,3 +78,13 @@ class RewriteSession(Session):
 
     def load_df_function(self, table: str):
         return self.delegate.load_df_function(table)
+
+
+if __name__ == "__main__":
+    rewriter = Rewriter(prefix="schema.")
+
+    @rewriter.relation("test")
+    def test():
+        return "SELECT 1 as a, 'foo' as b"
+
+    print(rewriter.rewrite("SELECT * FROM schema.test"))
