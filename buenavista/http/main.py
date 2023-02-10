@@ -56,11 +56,13 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
     id = f"{h.process_id}-{start}"
     try:
         qr = h.execute_sql(query)
+        cols = _to_columns(qr)
+        is_decimal = [str(c).startswith("DECIMAL") for c in cols]
         return schemas.QueryResults(
             id=id,
             info_uri="http://127.0.0.1/info",
-            columns=_to_columns(qr),
-            data=list(qr.rows()),
+            columns=cols,
+            data=[_convert(r, is_decimal) for r in qr.rows()],
             stats=schemas.StatementStats(
                 state="COMPLETE",
                 elapsed_time_millis=(round(time.time() * 1000) - start),
@@ -87,4 +89,14 @@ def _to_columns(qr: QueryResult) -> List[schemas.Column]:
     for i in range(qr.column_count()):
         col = qr.column(i)
         ret.append(schemas.Column(name=col[0], type=str(col[1]).lower()))
+    return ret
+
+
+def _convert(row: List, is_decimal: List[bool]) -> List:
+    ret = []
+    for i in range(len(row)):
+        if is_decimal[i]:
+            ret.append(str(row[i]))
+        else:
+            ret.append(row[i])
     return ret
