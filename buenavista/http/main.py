@@ -57,7 +57,7 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
     try:
         qr = h.execute_sql(query)
         cols = _to_columns(qr)
-        is_decimal = [str(c).startswith("decimal") for c in cols]
+        is_decimal = [c.type.startswith("decimal") for c in cols]
         return schemas.QueryResults(
             id=id,
             info_uri="http://127.0.0.1/info",
