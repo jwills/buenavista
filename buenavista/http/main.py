@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import functools
+import os
 import time
 from typing import List
 
@@ -18,8 +19,13 @@ app = FastAPI()
 
 @app.on_event("startup")
 def startup():
-    # TODO: generalize this config here
-    app.conn = DuckDBConnection(duckdb.connect())
+    if os.getenv("DUCKDB_FILE"):
+        print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
+        db = duckdb.connect(os.getenv("DUCKDB_FILE"), read_only=True)
+    else:
+        print("Using in-memory DuckDB")
+        db = duckdb.connect()
+    app.conn = DuckDBConnection(db)
     app.pool = concurrent.futures.ThreadPoolExecutor()
 
 
