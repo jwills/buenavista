@@ -30,7 +30,7 @@ def pg_type(t: pa.DataType) -> PGType:
     elif pa.types.is_floating(t):
         return PGTypes.FLOAT
     elif pa.types.is_decimal(t):
-        return PGTypes.NUMERIC
+        return PGTypes.DECIMAL
     elif pa.types.is_binary(t):
         return PGTypes.BYTES
     elif pa.types.is_interval(t):
