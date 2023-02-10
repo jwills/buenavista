@@ -38,7 +38,7 @@ class PGTypes:
         lambda v: f"{v.days} days {v.seconds} seconds {v.microseconds} microseconds",
     )
     JSON = PGType(114, "JSON", lambda v: json.dumps(v))
-    NUMERIC = PGType(1700, "NUMERIC")
+    NUMERIC = PGType(1700, "DOUBLE")
     NULL = PGType(-1, "NULL", lambda v: None)
     TEXT = PGType(25, "VARCHAR")
     TIME = PGType(1083, "TIME", lambda v: v.isoformat())
