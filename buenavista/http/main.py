@@ -21,7 +21,7 @@ app = FastAPI()
 def startup():
     if os.getenv("DUCKDB_FILE"):
         print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
-        db = duckdb.connect(os.getenv("DUCKDB_FILE"), read_only=True)
+        db = duckdb.connect(os.getenv("DUCKDB_FILE"))
     else:
         print("Using in-memory DuckDB")
         db = duckdb.connect()
