@@ -16,23 +16,15 @@ from ..backends.duckdb import DuckDBConnection
 
 app = FastAPI()
 
+if os.getenv("DUCKDB_FILE"):
+    print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
+    db = duckdb.connect(os.getenv("DUCKDB_FILE"))
+else:
+    print("Using in-memory DuckDB")
+    db = duckdb.connect()
 
-@app.on_event("startup")
-def startup():
-    if os.getenv("DUCKDB_FILE"):
-        print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
-        db = duckdb.connect(os.getenv("DUCKDB_FILE"))
-    else:
-        print("Using in-memory DuckDB")
-        db = duckdb.connect()
-    app.conn = DuckDBConnection(db)
-    app.pool = concurrent.futures.ThreadPoolExecutor()
-
-
-@app.on_event("shutdown")
-def shutdown():
-    app.conn = None
-    app.pool = None
+app.conn = DuckDBConnection(db)
+app.pool = concurrent.futures.ThreadPoolExecutor()
 
 
 @app.get("/v1/info")
@@ -94,5 +86,5 @@ def _to_columns(qr: QueryResult) -> List[schemas.Column]:
     ret = []
     for i in range(qr.column_count()):
         col = qr.column(i)
-        ret.append(schemas.Column(name=col[0], type=str(col[1])))
+        ret.append(schemas.Column(name=col[0], type=str(col[1]).lower()))
     return ret
