@@ -85,7 +85,7 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
 
         data = []
         for r in qr.rows():
-            data.append([converters[i](r[i]) for i in len(r)])
+            data.append([converters[i](v) for i, v in enumerate(r)])
 
         return schemas.QueryResults(
             id=id,
