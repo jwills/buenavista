@@ -3,37 +3,22 @@ import concurrent.futures
 import functools
 import os
 import time
-from typing import List
 
 import duckdb
 from fastapi import Body, FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from . import schemas
+from . import schemas, type_mapping
 from ..core import BVType, Session
 from ..backends.duckdb import DuckDBConnection
 
-TYPE_NAMES = {
-    BVType.BIGINT: "BIGINT",
-    BVType.BOOL: "BOOL",
-    BVType.BYTES: "BYTES",
-    BVType.DATE: "DATE",
-    BVType.FLOAT: "FLOAT",
-    BVType.INTEGER: "INTEGER",
-    BVType.INTERVAL: "INTERVAL",
-    BVType.JSON: "JSON",
-    BVType.DECIMAL: "DECIMAL(38, 0)",
-    BVType.NULL: "NULL",
-    BVType.TEXT: "VARCHAR",
-    BVType.TIME: "TIME",
-    BVType.TIMESTAMP: "TIMESTAMP",
-}
 TYPE_CONVERTERS = {
     BVType.DECIMAL: str,
 }
 
 app = FastAPI()
+app.start_time = time.time()
 
 if os.getenv("DUCKDB_FILE"):
     print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
@@ -48,19 +33,20 @@ app.pool = concurrent.futures.ThreadPoolExecutor()
 
 @app.get("/v1/info")
 async def info():
+    uptime_minutes = (time.time() - app.start_time) / 60.0
     return {
-        "coordinator": {},
-        "workers": [],
-        "memory": {},
-        "jvm": {},
-        "system": {},
+        "coordinator": True,
+        "environment": "buenavista",
+        "starting": False,
+        "nodeVersion": {"version": 408},
+        "uptime": f"{uptime_minutes:.2f} minutes",
     }
 
 
 @app.post("/v1/statement")
 async def statement(req: Request, query: str = Body(...)) -> Response:
-    # user = req.headers["X-Presto-User"]
-    # Get/create handle here
+    # TODO: check user, do stuff with it
+    _ = req.headers.get("X-Trino-User")
     sess = app.conn.create_session()
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(
@@ -78,8 +64,7 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
         cols, converters = [], []
         for i in range(qr.column_count()):
             name, bvtype = qr.column(i)
-            ttype = TYPE_NAMES.get(bvtype)
-            cts = schemas.ClientTypeSignature(raw_type=ttype, arguments=[])
+            ttype, cts = type_mapping.to_trino(bvtype)
             cols.append(schemas.Column(name=name, type=ttype, type_signature=cts))
             converters.append(TYPE_CONVERTERS.get(bvtype, lambda x: x))
 
