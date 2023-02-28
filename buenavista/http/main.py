@@ -78,9 +78,9 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
         cols, converters = [], []
         for i in range(qr.column_count()):
             name, bvtype = qr.column(i)
-            cols.append(
-                schemas.Column(name=name, type=TYPE_NAMES.get(bvtype, "UNKNOWN"))
-            )
+            ttype = TYPE_NAMES.get(bvtype)
+            cts = schemas.ClientTypeSignature(raw_type=ttype, arguments=[])
+            cols.append(schemas.Column(name=name, type=ttype, type_signature=cts))
             converters.append(TYPE_CONVERTERS.get(bvtype, lambda x: x))
 
         data = []
@@ -92,6 +92,7 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
             info_uri="http://127.0.0.1/info",
             columns=cols,
             data=data,
+            update_type=qr.status(),
             stats=schemas.StatementStats(
                 state="COMPLETE",
                 elapsed_time_millis=(round(time.time() * 1000) - start),

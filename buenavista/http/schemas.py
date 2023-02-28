@@ -15,10 +15,20 @@ class CamelModel(BaseModel):
         allow_population_by_field_name = True
 
 
+class ClientTypeSignatureParameter(CamelModel):
+    kind: str
+    value: Any
+
+
+class ClientTypeSignature(CamelModel):
+    raw_type: str
+    arguments: List[ClientTypeSignatureParameter]
+
+
 class Column(CamelModel):
     name: str
     type: str
-    type_signature: Optional[CamelModel] = None
+    type_signature: Optional[ClientTypeSignature] = None
 
 
 class StatementStats(CamelModel):
