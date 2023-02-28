@@ -2,22 +2,43 @@ import io
 import logging
 import os
 import re
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import pandas as pd
 import psycopg
 from psycopg_pool import ConnectionPool
 
-from buenavista.core import Connection, QueryResult, Session
-from buenavista.types import PGType
+from buenavista.core import BVType, Connection, QueryResult, Session
+
+
+OID_TO_BVTYPE = {
+    -1: BVType.NULL,
+    16: BVType.BOOL,
+    17: BVType.BYTES,
+    20: BVType.BIGINT,
+    23: BVType.INTEGER,
+    25: BVType.TEXT,
+    114: BVType.JSON,
+    701: BVType.FLOAT,
+    705: BVType.UNKNOWN,
+    1082: BVType.DATE,
+    1083: BVType.TIME,
+    1114: BVType.TIMESTAMP,
+    1186: BVType.INTERVAL,
+    1700: BVType.DECIMAL,
+}
 
 
 class PGQueryResult(QueryResult):
     def __init__(
-        self, fields: List[Tuple[str, PGType]], rows: List[List[Optional[str]]]
+        self,
+        fields: List[Tuple[str, BVType]],
+        rows: List[List[Optional[Any]]],
+        status: Optional[str] = None,
     ):
         self.fields = fields
         self._rows = rows
+        self._status = status
 
     def has_results(self) -> bool:
         return bool(self.fields)
@@ -25,17 +46,14 @@ class PGQueryResult(QueryResult):
     def column_count(self):
         return len(self.fields)
 
-    def column(self, index: int) -> Tuple[str, PGType]:
+    def column(self, index: int) -> Tuple[str, BVType]:
         return self.fields[index]
 
     def rows(self) -> Iterator[List]:
-        def t(row):
-            return [
-                v if v is None else self.fields[i][1].converter(v)
-                for i, v in enumerate(row)
-            ]
+        return iter(self._rows)
 
-        return iter(map(t, self._rows))
+    def status(self):
+        return self._status
 
 
 class PGSession(Session):
@@ -59,11 +77,12 @@ class PGSession(Session):
             self._cursor.execute(sql, params)
         else:
             self._cursor.execute(sql)
+        status = self._cursor.statusmessage
         if self._cursor.description:
             rows = self._cursor.fetchall()
-            res = self.to_query_result(self._cursor.description, rows)
+            res = self.to_query_result(self._cursor.description, rows, status)
         else:
-            res = PGQueryResult([], [])
+            res = PGQueryResult([], [], status=status)
         return res
 
     def in_transaction(self) -> bool:
@@ -78,13 +97,13 @@ class PGSession(Session):
         out.seek(0)
         return pd.read_csv(out)
 
-    def to_query_result(self, description, rows) -> QueryResult:
+    def to_query_result(self, description, rows, status) -> QueryResult:
         fields = []
         for d in description:
             name, oid = d[0], d[1]
-            f = (name, PGType.find_by_oid(oid))
+            f = (name, OID_TO_BVTYPE.get(oid, BVType.UNKNOWN))
             fields.append(f)
-        return PGQueryResult(fields, rows)
+        return PGQueryResult(fields, rows, status)
 
 
 class PGConnection(Connection):

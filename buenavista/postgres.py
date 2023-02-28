@@ -7,7 +7,7 @@ import socketserver
 import struct
 from typing import Dict, List, Optional
 
-from .core import Connection, Extension, Session, QueryResult
+from .core import BVType, Connection, Extension, Session, QueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,27 @@ class ClientCommand:
     PARSE = b"P"
     SYNC = b"S"
     TERMINATE = b"X"
+
+
+PG_UNKNOWN = (705, str)
+BVTYPE_TO_PGTYPE = {
+    BVType.NULL: (-1, lambda v: None),
+    BVType.BIGINT: (20, str),
+    BVType.BOOL: (16, lambda v: "true" if v else "false"),
+    BVType.BYTES: (17, lambda v: "\\x" + v.hex()),
+    BVType.DATE: (1082, lambda v: v.isoformat()),
+    BVType.FLOAT: (701, str),
+    BVType.INTEGER: (23, str),
+    BVType.INTERVAL: (
+        1186,
+        lambda v: f"{v.days} days {v.seconds} seconds {v.microseconds} microseconds",
+    ),
+    BVType.JSON: (114, lambda v: json.dumps(v)),
+    BVType.DECIMAL: (1700, str),
+    BVType.TEXT: (25, str),
+    BVType.TIME: (1083, lambda v: v.isoformat()),
+    BVType.TIMESTAMP: (1114, lambda v: v.isoformat().replace("T", " ")),
+}
 
 
 class BVBuffer(object):
@@ -400,9 +421,10 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
         for i in range(query_result.column_count()):
-            name, pgtype = query_result.column(i)
+            name, bvtype = query_result.column(i)
+            oid = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[0]
             buf.write_string(name)
-            buf.write_bytes(struct.pack("!ihihih", 0, 0, pgtype.oid, 0, -1, 0))
+            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, 0))
         out = buf.get_value()
         sig = struct.pack(
             "!cih",
@@ -414,14 +436,17 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def send_data_rows(self, query_result: QueryResult, limit: int = 0) -> int:
         cnt = 0
+        converters = []
+        for i in range(query_result.column_count()):
+            bvtype = query_result.column(i)[1]
+            converters.append(BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[1])
         for row in query_result.rows():
             buf = BVBuffer()
             for i, r in enumerate(row):
                 if r is None:
                     buf.write_int32(-1)
                 else:
-                    # TODO: ugh this is ugly af, need to fix it
-                    v = query_result.column(i)[1].convert(r).encode("utf-8")
+                    v = converters[i](r).encode("utf-8")
                     buf.write_int32(len(v))
                     buf.write_bytes(v)
             out = buf.get_value()

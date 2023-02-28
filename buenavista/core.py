@@ -1,7 +1,23 @@
+import enum
 import random
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from .types import PGType
+
+class BVType(enum.Enum):
+    NULL = 0
+    BIGINT = 1
+    BOOL = 2
+    BYTES = 3
+    DATE = 4
+    FLOAT = 5
+    INTEGER = 6
+    INTERVAL = 7
+    JSON = 8
+    DECIMAL = 9
+    TEXT = 10
+    TIME = 11
+    TIMESTAMP = 12
+    UNKNOWN = 13
 
 
 class QueryResult:
@@ -13,7 +29,7 @@ class QueryResult:
     def column_count(self):
         raise NotImplementedError
 
-    def column(self, index: int) -> Tuple[str, PGType]:
+    def column(self, index: int) -> Tuple[str, BVType]:
         raise NotImplementedError
 
     def rows(self) -> Iterator[List]:
@@ -79,7 +95,7 @@ class Extension:
 
 
 class SimpleQueryResult(QueryResult):
-    def __init__(self, name: str, value: Any, type: PGType):
+    def __init__(self, name: str, value: Any, type: BVType):
         self.name = name
         self.value = str(value)
         self.type = type
@@ -90,7 +106,7 @@ class SimpleQueryResult(QueryResult):
     def column_count(self):
         return 1
 
-    def column(self, index: int) -> Tuple[str, int]:
+    def column(self, index: int) -> Tuple[str, BVType]:
         if index == 0:
             return (self.name, self.type.oid)
         else:

@@ -11,8 +11,27 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from . import schemas
-from ..core import Session, QueryResult
+from ..core import BVType, Session
 from ..backends.duckdb import DuckDBConnection
+
+TYPE_NAMES = {
+    BVType.BIGINT: "BIGINT",
+    BVType.BOOL: "BOOL",
+    BVType.BYTES: "BYTES",
+    BVType.DATE: "DATE",
+    BVType.FLOAT: "FLOAT",
+    BVType.INTEGER: "INTEGER",
+    BVType.INTERVAL: "INTERVAL",
+    BVType.JSON: "JSON",
+    BVType.DECIMAL: "DECIMAL(38, 0)",
+    BVType.NULL: "NULL",
+    BVType.TEXT: "VARCHAR",
+    BVType.TIME: "TIME",
+    BVType.TIMESTAMP: "TIMESTAMP",
+}
+TYPE_CONVERTERS = {
+    BVType.DECIMAL: str,
+}
 
 app = FastAPI()
 
@@ -56,13 +75,23 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
     id = f"{h.process_id}-{start}"
     try:
         qr = h.execute_sql(query)
-        cols = _to_columns(qr)
-        is_decimal = [c.type.startswith("decimal") for c in cols]
+        cols, converters = [], []
+        for i in range(qr.column_count()):
+            name, bvtype = qr.column(i)
+            cols.append(
+                schemas.Column(name=name, type=TYPE_NAMES.get(bvtype, "UNKNOWN"))
+            )
+            converters.append(TYPE_CONVERTERS.get(bvtype, lambda x: x))
+
+        data = []
+        for r in qr.rows():
+            data.append([converters[i](r[i]) for i in len(r)])
+
         return schemas.QueryResults(
             id=id,
             info_uri="http://127.0.0.1/info",
             columns=cols,
-            data=[_convert(r, is_decimal) for r in qr.rows()],
+            data=data,
             stats=schemas.StatementStats(
                 state="COMPLETE",
                 elapsed_time_millis=(round(time.time() * 1000) - start),
@@ -82,21 +111,3 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
                 elapsed_time_millis=(round(time.time() * 1000) - start),
             ),
         )
-
-
-def _to_columns(qr: QueryResult) -> List[schemas.Column]:
-    ret = []
-    for i in range(qr.column_count()):
-        col = qr.column(i)
-        ret.append(schemas.Column(name=col[0], type=str(col[1]).lower()))
-    return ret
-
-
-def _convert(row: List, is_decimal: List[bool]) -> List:
-    ret = []
-    for i in range(len(row)):
-        if is_decimal[i]:
-            ret.append(str(row[i]))
-        else:
-            ret.append(row[i])
-    return ret

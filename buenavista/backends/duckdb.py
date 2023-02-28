@@ -5,47 +5,45 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import duckdb
 import pyarrow as pa
 
-from buenavista.core import Connection, QueryResult, Session
-from buenavista.types import PGType, PGTypes
+from buenavista.core import BVType, Connection, QueryResult, Session
 
 
 logger = logging.getLogger(__name__)
 
 
-def pg_type(t: pa.DataType) -> PGType:
+def to_bvtype(t: pa.DataType) -> BVType:
     if pa.types.is_boolean(t):
-        return PGTypes.BOOL
+        return BVType.BOOL
     elif pa.types.is_int64(t):
-        return PGTypes.BIGINT
+        return BVType.BIGINT
     elif pa.types.is_integer(t):
-        return PGTypes.INTEGER
+        return BVType.INTEGER
     elif pa.types.is_string(t):
-        return PGTypes.TEXT
+        return BVType.TEXT
     elif pa.types.is_date(t):
-        return PGTypes.DATE
+        return BVType.DATE
     elif pa.types.is_time(t):
-        return PGTypes.TIME
+        return BVType.TIME
     elif pa.types.is_timestamp(t):
-        return PGTypes.TIMESTAMP
+        return BVType.TIMESTAMP
     elif pa.types.is_floating(t):
-        return PGTypes.FLOAT
+        return BVType.FLOAT
     elif pa.types.is_decimal(t):
-        return PGTypes.DECIMAL
+        return BVType.DECIMAL
     elif pa.types.is_binary(t):
-        return PGTypes.BYTES
+        return BVType.BYTES
     elif pa.types.is_interval(t):
-        return PGTypes.INTERVAL
+        return BVType.INTERVAL
     elif pa.types.is_list(t) or pa.types.is_struct(t) or pa.types.is_map(t):
         # TODO: support detailed nested types
-        return PGTypes.TEXT
+        return BVType.TEXT
     else:
-        return PGTypes.UNKNOWN
+        return BVType.UNKNOWN
 
 
 class RecordBatchIterator(Iterator[List[Optional[str]]]):
-    def __init__(self, rbr: pa.RecordBatchReader, pg_types: List[PGType]):
+    def __init__(self, rbr: pa.RecordBatchReader):
         self.rbr = rbr
-        self.pg_types = pg_types
 
     def __iter__(self):
         try:
@@ -74,10 +72,10 @@ class DuckDBQueryResult(QueryResult):
     ):
         if rbr:
             self.rbr = rbr
-            self.pg_types = [pg_type(s.type) for s in rbr.schema]
+            self.bvtypes = [to_bvtype(s.type) for s in rbr.schema]
         else:
             self.rbr = None
-            self.pg_types = []
+            self.bvtypes = []
         self._status = status
 
     def has_results(self) -> bool:
@@ -89,16 +87,16 @@ class DuckDBQueryResult(QueryResult):
         else:
             return 0
 
-    def column(self, index: int) -> Tuple[str, PGType]:
+    def column(self, index: int) -> Tuple[str, BVType]:
         if self.rbr:
             s = self.rbr.schema[index]
-            return s.name, self.pg_types[index]
+            return s.name, self.bvtypes[index]
         else:
             raise IndexError("No column at index %d" % index)
 
     def rows(self) -> Iterator[List]:
         if self.rbr:
-            return RecordBatchIterator(self.rbr, self.pg_types)
+            return RecordBatchIterator(self.rbr)
         else:
             return iter([])
 
@@ -214,33 +212,6 @@ class DuckDBConnection(Connection):
     def __init__(self, db):
         super().__init__()
         self.db = db
-        self._do_setup()
-
-    def _do_setup(self):
-        # some tables/view definitions we need for DBeaver
-        if duckdb.__version__ < "0.6.1":
-            self.db.execute(
-                "CREATE OR REPLACE VIEW pg_catalog.pg_database AS SELECT 0 oid, 'main' datname"
-            )
-            self.db.execute(
-                "CREATE OR REPLACE VIEW pg_catalog.pg_proc AS SELECT cast(floor(1000000*random()) as bigint) oid, function_name proname, s.oid pronamespace, return_type prorettype, parameters proargnames, function_type = 'aggregate' proisagg, function_type = 'table' proretset FROM duckdb_functions() f LEFT JOIN duckdb_schemas() s USING (schema_name)"
-            )
-            self.db.execute(
-                "CREATE OR REPLACE VIEW pg_catalog.pg_settings AS SELECT name, value setting, description short_desc, CASE WHEN input_type = 'VARCHAR' THEN 'string' WHEN input_type = 'BOOLEAN' THEN 'bool' WHEN input_type IN ('BIGINT', 'UBIGINT') THEN 'integer' ELSE input_type END vartype FROM duckdb_settings()"
-            )
-
-        self.db.execute(
-            "CREATE OR REPLACE FUNCTION pg_catalog.pg_total_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
-        )
-        self.db.execute(
-            "CREATE OR REPLACE FUNCTION pg_catalog.pg_relation_size(oid) AS (SELECT estimated_size FROM duckdb_tables() WHERE table_oid = oid)"
-        )
-        self.db.execute(
-            "CREATE OR REPLACE FUNCTION array_upper(arr, index) AS (CASE WHEN index = 1 THEN len(arr) WHEN index = 2 THEN len(arr[1]) END)"
-        )
-        self.db.execute(
-            "CREATE OR REPLACE FUNCTION to_char(expression, format) AS CAST(expression as VARCHAR)"
-        )
 
     def parameters(self) -> Dict[str, str]:
         return {
@@ -259,10 +230,10 @@ if __name__ == "__main__":
     from buenavista.postgres import BuenaVistaServer
     import sys
 
-    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.DEBUG)
+    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
 
     if len(sys.argv) < 2:
-        print("Using in-memory DuckDB database")
+        logger.info("Using in-memory DuckDB database")
         db = duckdb.connect()
     else:
         logger.info("Using DuckDB database at %s", sys.argv[1])
