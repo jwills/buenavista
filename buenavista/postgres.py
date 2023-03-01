@@ -2,6 +2,7 @@ import io
 import json
 import logging
 import os
+import random
 import re
 import socketserver
 import struct
@@ -129,16 +130,12 @@ class BVContext:
     def __init__(self, session: Session, params: Dict[str, str]):
         self.session = session
         self.params = params
+        self.process_id = random.randint(0, 2**32 - 1)
+        self.secret_key = random.randint(0, 2**32 - 1)
         self.stmts = {}
         self.portals = {}
         self.result_cache = {}
         self.has_error = False
-
-    def process_id(self):
-        return self.session.process_id
-
-    def secret_key(self):
-        return self.session.secret_key
 
     def mark_error(self):
         self.has_error = True
@@ -194,16 +191,19 @@ class BVContext:
         if self.has_error:
             self.has_error = False
 
-    def close(self):
-        self.session.close()
-
 
 class BuenaVistaHandler(socketserver.StreamRequestHandler):
+    def __init__(self):
+        super().__init__()
+        self._ctxts = {}
+
     def handle(self):
         self.r = BVBuffer(self.rfile)
         ctx = None
         try:
             ctx = self.handle_startup(self.server.conn)
+            if ctx:
+                self._ctxts[ctx.process_id] = ctx
             while ctx:
                 type_code = self.r.read_byte()
                 if not type_code or type_code == ClientCommand.TERMINATE:
@@ -241,6 +241,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
         if ctx:
             self.server.conn.close_session(ctx.session)
+            del self._ctxts[ctx.process_id]
             ctx = None
 
     def handle_startup(self, conn: Connection) -> BVContext:
@@ -264,9 +265,11 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return ctx
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
-            sess = conn.get_session(process_id, secret_key)
-            if sess and sess.secret_key == secret_key:
-                conn.close_session(sess)
+            ctx = self._ctxts.get(process_id)
+            if ctx and ctx.secret_key == secret_key:
+                self.server.conn.close_session(ctx.session)
+                del self._ctxts[ctx.process_id]
+                ctx = None
             return None
         else:
             raise Exception(f"Unsupported startup message: {code}")

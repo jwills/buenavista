@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from . import schemas, type_mapping
 from ..core import BVType, Session
 from ..backends.duckdb import DuckDBConnection
+from ..rewriters import duckdb_http
+from ..rewrite import RewriteConnection
 
 TYPE_CONVERTERS = {
     BVType.DECIMAL: str,
@@ -27,8 +29,15 @@ else:
     print("Using in-memory DuckDB")
     db = duckdb.connect()
 
-app.conn = DuckDBConnection(db)
+app.conn = RewriteConnection(duckdb_http.rewriter, DuckDBConnection(db))
 app.pool = concurrent.futures.ThreadPoolExecutor()
+app.sessions = {}
+
+
+def get_session(user: str) -> Session:
+    if user not in app.sessions:
+        app.sessions[user] = app.conn.create_session()
+    return app.sessions[user]
 
 
 @app.get("/v1/info")
@@ -46,21 +55,22 @@ async def info():
 @app.post("/v1/statement")
 async def statement(req: Request, query: str = Body(...)) -> Response:
     # TODO: check user, do stuff with it
-    _ = req.headers.get("X-Trino-User")
-    sess = app.conn.create_session()
+    user = req.headers.get("X-Trino-User", req.headers.get("X-Presto-User", "default"))
+    sess = get_session(user)
     loop = asyncio.get_running_loop()
+    print("HTTP Query: " + query)
     result = await loop.run_in_executor(
         app.pool, functools.partial(_execute, sess, query)
     )
-    app.conn.close_session(sess)
     return JSONResponse(content=jsonable_encoder(result))
 
 
-def _execute(h: Session, query: bytes) -> schemas.QueryResults:
+def _execute(h: Session, query: str) -> schemas.QueryResults:
     start = round(time.time() * 1000)
-    id = f"{h.process_id}-{start}"
+    id = f"{app.start_time}_{start}"
     try:
         qr = h.execute_sql(query)
+        print(f"Query {query} has {qr.column_count()} columns in response")
         cols, converters = [], []
         for i in range(qr.column_count()):
             name, bvtype = qr.column(i)
@@ -72,12 +82,18 @@ def _execute(h: Session, query: bytes) -> schemas.QueryResults:
         for r in qr.rows():
             data.append([converters[i](v) for i, v in enumerate(r)])
 
+        # If nothing was returned, see what kind of update this was
+        if qr.column_count() == 0:
+            update_type = qr.status()
+        else:
+            update_type = None
+
         return schemas.QueryResults(
             id=id,
             info_uri="http://127.0.0.1/info",
             columns=cols,
             data=data,
-            update_type=qr.status(),
+            update_type=update_type,
             stats=schemas.StatementStats(
                 state="COMPLETE",
                 elapsed_time_millis=(round(time.time() * 1000) - start),

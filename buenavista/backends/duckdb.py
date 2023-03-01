@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from typing import Dict, Iterator, List, Optional, Tuple
 
 import duckdb
@@ -132,13 +133,18 @@ class DuckDBSession(Session):
 
     def rewrite_sql(self, sql: str) -> str:
         """Some minimalist SQL rewrites, inspired by postlite, to make DBeaver less unhappy."""
+        if match := re.search(r"PREPARE\s+(\w+)\s+FROM", sql):
+            stmt = match.group(1)
+            target = f"PREPARE {stmt} FROM"
+            replace = f"PREPARE {stmt} AS"
+            return sql.replace(target, replace)
         if sql.startswith("SET "):
             tokens = sql.split()
             if tokens[1].lower() in self.config_params:
                 return sql
             else:
                 return ""
-        if sql == "SHOW search_path":
+        elif sql == "SHOW search_path":
             return "SELECT current_setting('search_path') as search_path"
         elif sql == "SHOW TRANSACTION ISOLATION LEVEL":
             return "SELECT 'read committed' as transaction_isolation"
@@ -185,9 +191,9 @@ class DuckDBSession(Session):
             self.in_txn = True
             status = "BEGIN"
 
-        logger.debug("Original SQL: %s", sql)
+        print("Original SQL: ", sql)
         sql = self.rewrite_sql(sql)
-        logger.debug("Rewritten SQL: %s", sql)
+        print("Rewritten SQL: ", sql)
         if params:
             self._cursor.execute(sql, params)
         else:
@@ -200,6 +206,7 @@ class DuckDBSession(Session):
                 or "with" in lsql
                 or "describe" in lsql
                 or "show" in lsql
+                or "execute" in lsql
             ):
                 rb = self._cursor.fetch_record_batch()
             elif "load " in lsql:

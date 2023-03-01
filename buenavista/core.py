@@ -1,5 +1,5 @@
 import enum
-import random
+import uuid
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 
@@ -41,8 +41,7 @@ class QueryResult:
 
 class Session:
     def __init__(self):
-        self.process_id = random.randint(0, 2**31 - 1)
-        self.secret_key = random.randint(0, 2**31 - 1)
+        self.id = uuid.uuid4()
 
     def cursor(self):
         raise NotImplementedError
@@ -68,15 +67,15 @@ class Connection:
 
     def create_session(self) -> Session:
         sess = self.new_session()
-        self._sessions[sess.process_id] = sess
+        self._sessions[sess.id] = sess
         return sess
 
-    def get_session(self, process_id: int) -> Optional[Session]:
-        return self._sessions.get(process_id)
+    def get_session(self, id: int) -> Optional[Session]:
+        return self._sessions.get(id)
 
     def close_session(self, session: Session):
-        if session and session.process_id in self._sessions:
-            del self._sessions[session.process_id]
+        if session and session.id in self._sessions:
+            del self._sessions[session.id]
             session.close()
 
     def new_session(self) -> Session:
