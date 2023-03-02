@@ -77,15 +77,20 @@ class PrestoWarning(CamelModel):
     message: str
 
 
-class QueryResults(CamelModel):
+class BaseResult(CamelModel):
     id: str
     info_uri: HttpUrl
+    stats: StatementStats
+    warnings: Optional[List[PrestoWarning]]
+
+
+class QueryResult(BaseResult):
     partial_cancel_uri: Optional[HttpUrl]
-    next_uri: Optional[HttpUrl]
     columns: Optional[List[Column]]
     data: Optional[List[List[Any]]]
-    stats: StatementStats
-    error: Optional[QueryError]
-    warnings: Optional[List[PrestoWarning]]
     update_type: Optional[str]
     update_count: Optional[int]
+
+
+class ErrorResult(BaseResult):
+    error: QueryError
