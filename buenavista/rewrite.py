@@ -9,10 +9,10 @@ DecoratedCallable = TypeVar("DecoratedCallable", bound=Callable[..., Any])
 
 
 class Rewriter:
-    def __init__(self, read, write):
+    def __init__(self, read: sqlglot.Dialect, write: sqlglot.Dialect):
         self._relations = {}
         self._read = read
-        self._dialect = sqlglot.Dialect.get_or_raise(write)()
+        self._write = write
 
     def relation(self, name: str) -> Callable[[DecoratedCallable], DecoratedCallable]:
         def decorator(func: DecoratedCallable) -> DecoratedCallable:
@@ -22,11 +22,11 @@ class Rewriter:
         return decorator
 
     def rewrite(self, sql: str) -> str:
-        stmts = sqlglot.parse(sql, self._read)
+        stmts = self._read.parse(sql)
         ret = []
         for stmt in stmts:
             ret.append(self.rewrite_one(stmt))
-        return ";\n".join(self._dialect.generate(s) for s in ret)
+        return ";\n".join(self._write.generate(s) for s in ret)
 
     def rewrite_one(self, expression: exp.Expression) -> exp.Expression:
         def _expand(node: exp.Expression):

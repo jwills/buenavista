@@ -1,6 +1,7 @@
 from ..rewrite import Rewriter
+from . import bv_dialects
 
-rewriter = Rewriter(read="presto", write="duckdb")
+rewriter = Rewriter(bv_dialects.BVTrino(), bv_dialects.BVDuckDB())
 
 
 @rewriter.relation("system.jdbc.tables")

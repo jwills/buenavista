@@ -185,9 +185,10 @@ class DuckDBSession(Session):
             elif "rollback" in lsql:
                 self.in_txn = False
                 status = "ROLLBACK"
-            elif "begin" in lsql:
+            elif "begin" in lsql or "start transaction" in lsql:
                 return DuckDBQueryResult(status="BEGIN")
-        elif "begin" in lsql:
+        elif "begin" in lsql or "start transaction" in lsql:
+            lsql = "begin"
             self.in_txn = True
             status = "BEGIN"
 
