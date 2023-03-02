@@ -51,6 +51,8 @@ def _duckdb_command_handler(self, expression):
         elif entity == "TABLES":
             return "SELECT DISTINCT table_name as Table from information_schema.tables"
             # TODO: LIKE
+        elif entity == "COLUMNS" and tokens[1].upper() == "FROM":
+            return f"DESCRIBE {tokens[2]}"
         else:
             raise Exception("Unhandled SHOW command: " + literal)
 

@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 from ..core import BVType
-from .schemas import ClientTypeSignature, ClientTypeSignatureParameter
+from .schemas import ClientTypeSignature, ClientTypeSignatureParameter, Column
 
 
 def _long(value: int) -> ClientTypeSignatureParameter:
@@ -14,6 +14,20 @@ def _cts(
     return ClientTypeSignature(raw_type=raw_type, arguments=arguments)
 
 
+STRING_CTS = _cts("varchar", [_long(2**32)])
+
+
+def _string_col(name: str):
+    return Column(name=name, type="varchar", type_signature=STRING_CTS)
+
+
+DESCRIBE_COLUMNS = [
+    _string_col("Column"),
+    _string_col("Type"),
+    _string_col("Extra"),
+    _string_col("Comment"),
+]
+
 TYPE_MAPPING = {
     BVType.BIGINT: ("bigint", _cts("bigint")),
     BVType.BOOL: ("bool", _cts("bool")),
@@ -25,7 +39,7 @@ TYPE_MAPPING = {
     BVType.JSON: ("json", _cts("json")),
     BVType.DECIMAL: ("decimal(38, 0)", _cts("decimal", [_long(38), _long(0)])),
     # Special casing for null tbd
-    BVType.TEXT: ("varchar", _cts("varchar", [_long(2**32)])),
+    BVType.TEXT: ("varchar", STRING_CTS),
     BVType.TIME: ("time", _cts("time")),
     BVType.TIMESTAMP: ("timestamp", _cts("timestamp")),
 }
