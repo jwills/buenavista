@@ -5,7 +5,7 @@ import os
 import time
 
 import duckdb
-from fastapi import Body, FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
@@ -53,16 +53,18 @@ async def info():
 
 
 @app.post("/v1/statement")
-async def statement(req: Request, query: str = Body(...)) -> Response:
+async def statement(req: Request) -> Response:
     # TODO: check user, do stuff with it
     user = req.headers.get("X-Trino-User", req.headers.get("X-Presto-User", "default"))
+    raw_query = await req.body()
     sess = get_session(user)
     loop = asyncio.get_running_loop()
+    query = raw_query.decode('utf-8')
     print("HTTP Query: " + query)
     result = await loop.run_in_executor(
         app.pool, functools.partial(_execute, sess, query)
     )
-    return JSONResponse(content=jsonable_encoder(result))
+    return JSONResponse(content=jsonable_encoder(result.dict(exclude_none=True)))
 
 
 def _execute(h: Session, query: str) -> schemas.QueryResults:
