@@ -193,17 +193,13 @@ class BVContext:
 
 
 class BuenaVistaHandler(socketserver.StreamRequestHandler):
-    def __init__(self):
-        super().__init__()
-        self._ctxts = {}
-
     def handle(self):
         self.r = BVBuffer(self.rfile)
         ctx = None
         try:
             ctx = self.handle_startup(self.server.conn)
             if ctx:
-                self._ctxts[ctx.process_id] = ctx
+                self.server.ctxts[ctx.process_id] = ctx
             while ctx:
                 type_code = self.r.read_byte()
                 if not type_code or type_code == ClientCommand.TERMINATE:
@@ -241,7 +237,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
         if ctx:
             self.server.conn.close_session(ctx.session)
-            del self._ctxts[ctx.process_id]
+            del self.server.ctxts[ctx.process_id]
             ctx = None
 
     def handle_startup(self, conn: Connection) -> BVContext:
@@ -265,10 +261,10 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return ctx
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
-            ctx = self._ctxts.get(process_id)
+            ctx = self.server.ctxts.get(process_id)
             if ctx and ctx.secret_key == secret_key:
                 self.server.conn.close_session(ctx.session)
-                del self._ctxts[ctx.process_id]
+                del self.server.ctxts[ctx.process_id]
                 ctx = None
             return None
         else:
@@ -492,8 +488,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 "!ciii",
                 ServerResponse.BACKEND_KEY_DATA,
                 12,
-                ctx.process_id(),
-                ctx.secret_key(),
+                ctx.process_id,
+                ctx.secret_key,
             )
         )
 
@@ -541,6 +537,7 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
         super().__init__(server_address, BuenaVistaHandler)
         self.conn = conn
         self.extensions = {e.type(): e for e in extensions}
+        self.ctxts = {}
 
     def verify_request(self, request, client_address) -> bool:
         """Ensure all requests come from localhost until auth is in place"""
