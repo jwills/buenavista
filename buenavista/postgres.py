@@ -485,7 +485,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
     def send_backend_key_data(self, ctx):
         self.wfile.write(
             struct.pack(
-                "!ciii",
+                "!ciII",
                 ServerResponse.BACKEND_KEY_DATA,
                 12,
                 ctx.process_id,
