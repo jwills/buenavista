@@ -1,5 +1,7 @@
 duckdb
+fastapi[all]
 psycopg
 psycopg-pool
 pyarrow
 pytest
+sqlglot
