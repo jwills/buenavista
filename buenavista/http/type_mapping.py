@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 from ..core import BVType
 from .schemas import ClientTypeSignature, ClientTypeSignatureParameter, Column
@@ -43,6 +43,12 @@ TYPE_MAPPING = {
     BVType.TIME: ("time", _cts("time")),
     BVType.TIMESTAMP: ("timestamp", _cts("timestamp")),
 }
+
+
+def type_converter(bvtype: BVType) -> Callable:
+    if bvtype == BVType.DECIMAL:
+        return lambda x: str(x) if x else None
+    return lambda x: x
 
 
 def to_trino(bvtype: BVType) -> Tuple[str, ClientTypeSignature]:

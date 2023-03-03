@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import functools
+import logging
 import os
 import time
 
@@ -13,9 +14,9 @@ from . import schemas, type_mapping
 from ..core import BVType, Session, QueryResult
 from ..backends.duckdb import DuckDBConnection
 from ..rewriters import duckdb_http
-from ..rewrite import RewriteConnection
 
-TYPE_CONVERTERS = {BVType.DECIMAL: lambda x: str(x) if x else None}
+logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 app.start_time = time.time()
@@ -29,13 +30,10 @@ else:
 
 app.conn = DuckDBConnection(db)
 app.pool = concurrent.futures.ThreadPoolExecutor()
-app.sessions = {}
 
 
 def get_session(user: str) -> Session:
-    #if user not in app.sessions:
-    #    app.sessions[user] = app.conn.create_session()
-    #return app.sessions[user]
+    # TODO: session poooling
     return app.conn.create_session()
 
 
@@ -59,7 +57,7 @@ async def statement(req: Request) -> Response:
     sess = get_session(user)
     loop = asyncio.get_running_loop()
     query = raw_query.decode("utf-8")
-    print("HTTP Query: " + query)
+    logger.info("HTTP Query: %s", query)
     rewritten_query = duckdb_http.rewriter.rewrite(query)
     result = await loop.run_in_executor(
         app.pool, functools.partial(_execute, sess, rewritten_query)
@@ -72,7 +70,7 @@ def _execute(h: Session, query: str) -> schemas.BaseResult:
     id = f"{app.start_time}_{start}"
     try:
         qr = h.execute_sql(query)
-        print(f"Query {query} has {qr.column_count()} columns in response")
+        logger.debug(f"Query %s has %d columns in response", query, qr.column_count())
         cols, data, update_type = _convert_query_result(qr)
 
         return schemas.QueryResult(
@@ -103,21 +101,25 @@ def _execute(h: Session, query: str) -> schemas.BaseResult:
 
 
 def _convert_query_result(qr: QueryResult):
-    # Special handling for DESCRIBE-style results
-    if qr.column_count() == 6 and qr.column(0)[0] == "column_name" and qr.column(1)[0] == "column_type":
-       print("Performing DESCRIBE conversion on QueryResults")
-       cols = type_mapping.DESCRIBE_COLUMNS
-       data = []
-       for r in qr.rows():
-           data.append([r[0], r[1], "", ""])
-       return cols, data, None
+    # Special handling for DESCRIBE-style results for reasons
+    if (
+        qr.column_count() == 6
+        and qr.column(0)[0] == "column_name"
+        and qr.column(1)[0] == "column_type"
+    ):
+        logger.info("Performing DESCRIBE conversion on QueryResults")
+        cols = type_mapping.DESCRIBE_COLUMNS
+        data = []
+        for r in qr.rows():
+            data.append([r[0], r[1], "", ""])
+        return cols, data, None
 
     cols, converters = [], []
     for i in range(qr.column_count()):
         name, bvtype = qr.column(i)
         ttype, cts = type_mapping.to_trino(bvtype)
         cols.append(schemas.Column(name=name, type=ttype, type_signature=cts))
-        converters.append(TYPE_CONVERTERS.get(bvtype, lambda x: x))
+        converters.append(type_mapping.type_converter(bvtype))
 
     data = []
     for r in qr.rows():

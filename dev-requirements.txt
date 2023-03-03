@@ -4,3 +4,4 @@ psycopg
 psycopg-pool
 pyarrow
 pytest
+sqlglot
