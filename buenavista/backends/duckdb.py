@@ -236,6 +236,7 @@ class DuckDBConnection(Connection):
 
 if __name__ == "__main__":
     from buenavista.postgres import BuenaVistaServer
+    from buenavista.rewriters import duckdb_postgres
     import sys
 
     logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
@@ -258,7 +259,7 @@ if __name__ == "__main__":
 
     address = (bv_host, bv_port)
 
-    server = BuenaVistaServer(address, DuckDBConnection(db))
+    server = BuenaVistaServer(address, DuckDBConnection(db), rewriter=duckdb_postgres.rewriter)
     ip, port = server.server_address
     logger.info("Listening on {ip}:{port}".format(ip=ip, port=port))
 

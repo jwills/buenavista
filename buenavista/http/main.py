@@ -58,9 +58,8 @@ async def statement(req: Request) -> Response:
     loop = asyncio.get_running_loop()
     query = raw_query.decode("utf-8")
     logger.info("HTTP Query: %s", query)
-    rewritten_query = duckdb_http.rewriter.rewrite(query)
     result = await loop.run_in_executor(
-        app.pool, functools.partial(_execute, sess, rewritten_query)
+        app.pool, functools.partial(_execute, sess, query)
     )
     return JSONResponse(content=jsonable_encoder(result))
 
@@ -69,7 +68,8 @@ def _execute(h: Session, query: str) -> schemas.BaseResult:
     start = round(time.time() * 1000)
     id = f"{app.start_time}_{start}"
     try:
-        qr = h.execute_sql(query)
+        rewritten_query = duckdb_http.rewriter.rewrite(query)
+        qr = h.execute_sql(rewritten_query)
         logger.debug(f"Query %s has %d columns in response", query, qr.column_count())
         cols, data, update_type = _convert_query_result(qr)
 

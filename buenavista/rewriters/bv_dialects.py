@@ -1,13 +1,13 @@
 from sqlglot import exp
-from sqlglot.dialects.dialect import format_time_lambda
-from sqlglot.dialects.duckdb import DuckDB
-from sqlglot.dialects.trino import Trino
+from sqlglot.dialects import DuckDB, Postgres, Trino
 from sqlglot.tokens import TokenType
 
 # Additional expressions I need
 class ToISO8601(exp.Func):
     pass
 
+class BVPostgres(Postgres):
+    pass
 
 # Trino-specific modifications
 class BVTrino(Trino):
@@ -53,6 +53,10 @@ def _duckdb_command_handler(self, expression):
             # TODO: LIKE
         elif entity == "COLUMNS" and tokens[1].upper() == "FROM":
             return f"DESCRIBE {tokens[2]}"
+        elif entity == "TRANSACTION":
+            return "SELECT 'read committed' as transaction_isolation"
+        elif entity == "STANDARD_CONFORMING_STRINGS":
+            return "SELECT 'on' as standard_conforming_strings"
         else:
             raise Exception("Unhandled SHOW command: " + literal)
 

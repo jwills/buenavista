@@ -9,6 +9,7 @@ import struct
 from typing import Dict, List, Optional
 
 from .core import BVType, Connection, Extension, Session, QueryResult
+from .rewrite import Rewriter
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +128,9 @@ class BVBuffer(object):
 class BVContext:
     """Manages the state of a single connection to the server."""
 
-    def __init__(self, session: Session, params: Dict[str, str]):
+    def __init__(self, session: Session, rewriter: Optional[Rewriter], params: Dict[str, str]):
         self.session = session
+        self.rewriter = rewriter
         self.params = params
         self.process_id = random.randint(0, 2**32 - 1)
         self.secret_key = random.randint(0, 2**32 - 1)
@@ -148,19 +150,23 @@ class BVContext:
                 return TransactionStatus.IN_TRANSACTION
         return TransactionStatus.IDLE
 
-    def execute_sql(self, sql: str) -> QueryResult:
-        return self.session.execute_sql(sql)
+    def execute_sql(self, sql: str, params = None)-> QueryResult:
+        print("Input SQL: " + sql)
+        if self.rewriter:
+            sql = self.rewriter.rewrite(sql)
+            print("Rewritten SQL: " + sql)
+        return self.session.execute_sql(sql, params)
 
     def describe_portal(self, name: str) -> QueryResult:
         stmt, params = self.portals[name]
         sql = self.stmts[stmt]
-        query_result = self.session.execute_sql(sql=sql, params=params)
+        query_result = self.execute_sql(sql=sql, params=params)
         self.result_cache[name] = query_result
         return query_result
 
     def describe_statement(self, name: str) -> QueryResult:
         sql = self.stmts[name]
-        return self.session.execute_sql(sql)
+        return self.execute_sql(sql)
 
     def execute_portal(self, name: str) -> QueryResult:
         if name in self.result_cache:
@@ -170,7 +176,7 @@ class BVContext:
         else:
             stmt, params = self.portals[name]
             sql = self.stmts[stmt]
-            return self.session.execute_sql(sql=sql, params=params)
+            return self.execute_sql(sql=sql, params=params)
 
     def add_statement(self, name: str, sql: str):
         self.stmts[name] = sql
@@ -253,7 +259,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             ]
             params = dict(zip(msg[::2], msg[1::2]))
             logger.info("Client connection params: %s", params)
-            ctx = BVContext(conn.create_session(), params)
+            ctx = BVContext(conn.create_session(), self.server.rewriter, params)
             self.send_authentication_ok()
             self.send_parameter_status(conn.parameters())
             self.send_backend_key_data(ctx)
@@ -532,10 +538,11 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
     def __init__(
-        self, server_address, conn: Connection, extensions: List[Extension] = []
+        self, server_address, conn: Connection, *, rewriter: Optional[Rewriter] = None, extensions: List[Extension] = []
     ):
         super().__init__(server_address, BuenaVistaHandler)
         self.conn = conn
+        self.rewriter = rewriter
         self.extensions = {e.type(): e for e in extensions}
         self.ctxts = {}
 
