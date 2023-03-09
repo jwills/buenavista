@@ -128,7 +128,9 @@ class BVBuffer(object):
 class BVContext:
     """Manages the state of a single connection to the server."""
 
-    def __init__(self, session: Session, rewriter: Optional[Rewriter], params: Dict[str, str]):
+    def __init__(
+        self, session: Session, rewriter: Optional[Rewriter], params: Dict[str, str]
+    ):
         self.session = session
         self.rewriter = rewriter
         self.params = params
@@ -150,7 +152,7 @@ class BVContext:
                 return TransactionStatus.IN_TRANSACTION
         return TransactionStatus.IDLE
 
-    def execute_sql(self, sql: str, params = None)-> QueryResult:
+    def execute_sql(self, sql: str, params=None) -> QueryResult:
         print("Input SQL: " + sql)
         if self.rewriter:
             sql = self.rewriter.rewrite(sql)
@@ -538,7 +540,12 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
     def __init__(
-        self, server_address, conn: Connection, *, rewriter: Optional[Rewriter] = None, extensions: List[Extension] = []
+        self,
+        server_address,
+        conn: Connection,
+        *,
+        rewriter: Optional[Rewriter] = None,
+        extensions: List[Extension] = [],
     ):
         super().__init__(server_address, BuenaVistaHandler)
         self.conn = conn

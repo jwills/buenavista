@@ -6,8 +6,10 @@ from sqlglot.tokens import TokenType
 class ToISO8601(exp.Func):
     pass
 
+
 class BVPostgres(Postgres):
     pass
+
 
 # Trino-specific modifications
 class BVTrino(Trino):
