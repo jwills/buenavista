@@ -1,4 +1,6 @@
 import enum
+import json
+import re
 import uuid
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -86,6 +88,19 @@ class Connection:
 
 
 class Extension:
+    @classmethod
+    def check_json(cls, payload: str) -> Optional[dict]:
+        is_json = False
+        if payload[-1] == "}":
+            is_json = True
+        elif payload[-1] == ";" and payload[-2] == "}":
+            is_json = True
+        # Strip any SQL comments
+        if is_json:
+            payload = re.sub(r"\/\*.*\*\/", "", payload)
+            return json.loads(payload)
+        return None
+
     def type(self) -> str:
         raise NotImplementedError
 

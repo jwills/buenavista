@@ -25,6 +25,7 @@ def quacko(
 ):
     pool = concurrent.futures.ThreadPoolExecutor()
     start_time = time.time()
+    extensions_lookup = {e.type(): e for e in extensions}
 
     def get_session(user: str) -> Session:
         # TODO: session pooling
@@ -61,8 +62,17 @@ def quacko(
         start = round(time.time() * 1000)
         id = f"{start_time}_{start}"
         try:
-            rewritten_query = rewriter.rewrite(query)
-            qr = h.execute_sql(rewritten_query)
+            if req := Extension.check_json(query):
+                method = req.get("method")
+                extension = extensions_lookup.get(method)
+                if not extension:
+                    raise Exception("Unknown method: " + str(method))
+                else:
+                    qr = extension.apply(req.get("params"), h)
+            else:
+                rewritten_query = rewriter.rewrite(query)
+                qr = h.execute_sql(rewritten_query)
+
             logger.debug(
                 f"Query %s has %d columns in response", query, qr.column_count()
             )

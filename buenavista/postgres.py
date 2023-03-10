@@ -278,24 +278,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         else:
             raise Exception(f"Unsupported startup message: {code}")
 
-    def check_json(self, payload: str) -> Optional[dict]:
-        is_json = False
-        if payload[-1] == "}":
-            is_json = True
-        elif payload[-1] == ";" and payload[-2] == "}":
-            is_json = True
-        # Strip any SQL comments
-        if is_json:
-            payload = re.sub(r"\/\*.*\*\/", "", payload)
-            return json.loads(payload)
-        return None
-
     def handle_query(self, ctx: BVContext, payload: bytes):
         logger.debug("Handle query")
         decoded = payload.decode("utf-8").rstrip("\x00")
         try:
             # JSON payloads signal that we should use extensions
-            if req := self.check_json(decoded):
+            if req := Extension.check_json(decoded):
                 method = req.get("method")
                 extension = self.server.extensions.get(method)
                 if not extension:
