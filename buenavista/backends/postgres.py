@@ -121,24 +121,3 @@ class PGConnection(Connection):
 
     def parameters(self) -> Dict[str, str]:
         return {"server_version": "9.3.bvproxy", "client_encoding": "UTF8"}
-
-
-if __name__ == "__main__":
-    from buenavista.postgres import BuenaVistaServer
-
-    logging.basicConfig(format="%(thread)d: %(message)s", level=logging.INFO)
-
-    address = ("localhost", 5433)
-    server = BuenaVistaServer(
-        address,
-        PGConnection(
-            conninfo="",
-            host="localhost",
-            port=5432,
-            user=os.getenv("USER"),
-            dbname="postgres",
-        ),
-    )
-    ip, port = server.server_address
-    logging.info("Listening on {ip}:{port}".format(ip=ip, port=port))
-    server.serve_forever()
