@@ -1,7 +1,14 @@
-from ..rewrite import Rewriter
-from . import bv_dialects
+import os
 
-rewriter = Rewriter(bv_dialects.BVTrino(), bv_dialects.BVDuckDB())
+import duckdb
+from fastapi import FastAPI
+
+from .. import bv_dialects, rewrite
+from ..backends.duckdb import DuckDBConnection
+from ..http import main
+
+#### Rewriter setup/config
+rewriter = rewrite.Rewriter(bv_dialects.BVTrino(), bv_dialects.BVDuckDB())
 
 
 @rewriter.relation("system.jdbc.tables")
@@ -84,3 +91,15 @@ def jdbc_procedures():
         , CAST(NULL AS VARCHAR) as specific_name
         WHERE false
     """
+
+
+# Setup DuckDB file and FastAPI app with Presto API
+if os.getenv("DUCKDB_FILE"):
+    print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
+    db = duckdb.connect(os.getenv("DUCKDB_FILE"))
+else:
+    print("Using in-memory DuckDB")
+    db = duckdb.connect()
+
+app = FastAPI()
+main.quacko(app, DuckDBConnection(db), rewriter)

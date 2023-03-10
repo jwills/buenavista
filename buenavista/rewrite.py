@@ -1,12 +1,8 @@
-import logging
 from typing import Any, Callable, Dict, TypeVar
 
 import sqlglot
 import sqlglot.expressions as exp
 
-from .core import Connection, Session, QueryResult
-
-logger = logging.getLogger(__name__)
 DecoratedCallable = TypeVar("DecoratedCallable", bound=Callable[..., Any])
 
 

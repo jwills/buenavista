@@ -28,7 +28,7 @@ def quacko(
 
     def get_session(user: str) -> Session:
         # TODO: session pooling
-        return app.conn.create_session()
+        return conn.create_session()
 
     @app.get("/v1/info")
     async def info():
@@ -53,7 +53,7 @@ def quacko(
         query = raw_query.decode("utf-8")
         logger.info("HTTP Query: %s", query)
         result = await loop.run_in_executor(
-            app.pool, functools.partial(_execute, sess, query)
+            pool, functools.partial(_execute, sess, query)
         )
         return JSONResponse(content=jsonable_encoder(result))
 
@@ -61,7 +61,7 @@ def quacko(
         start = round(time.time() * 1000)
         id = f"{start_time}_{start}"
         try:
-            rewritten_query = duckdb_http.rewriter.rewrite(query)
+            rewritten_query = rewriter.rewrite(query)
             qr = h.execute_sql(rewritten_query)
             logger.debug(
                 f"Query %s has %d columns in response", query, qr.column_count()
@@ -120,20 +120,3 @@ def _convert_query_result(qr: QueryResult):
     for r in qr.rows():
         data.append([converters[i](v) for i, v in enumerate(r)])
     return cols, data, None
-
-
-if __name__ == "__main__":
-    import duckdb
-
-    from ..backends.duckdb import DuckDBConnection
-    from ..rewriters import duckdb_http
-
-    if os.getenv("DUCKDB_FILE"):
-        print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
-        db = duckdb.connect(os.getenv("DUCKDB_FILE"))
-    else:
-        print("Using in-memory DuckDB")
-        db = duckdb.connect()
-
-    app = FastAPI()
-    quacko(app, DuckDBConnection(db), duckdb_http.rewriter)
