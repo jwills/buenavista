@@ -122,12 +122,12 @@ class SimpleQueryResult(QueryResult):
 
     def column(self, index: int) -> Tuple[str, BVType]:
         if index == 0:
-            return (self.name, self.type.oid)
+            return (self.name, self.type)
         else:
             raise IndexError
 
-    def rows(self) -> Iterator[List[Optional[str]]]:
-        return iter([self.value])
+    def rows(self) -> Iterator[List]:
+        return iter([[self.value]])
 
     def status(self) -> str:
         return ""

@@ -26,10 +26,7 @@ def quacko(
     pool = concurrent.futures.ThreadPoolExecutor()
     start_time = time.time()
     extensions_lookup = {e.type(): e for e in extensions}
-
-    def get_session(user: str) -> Session:
-        # TODO: session pooling
-        return conn.create_session()
+    sessions = {}
 
     @app.get("/v1/info")
     async def info():
@@ -48,8 +45,11 @@ def quacko(
         user = req.headers.get(
             "X-Trino-User", req.headers.get("X-Presto-User", "default")
         )
+        sess = sessions.get(user)
+        if not sess:
+            sess = conn.create_session()
+            sessions[user] = sess
         raw_query = await req.body()
-        sess = get_session(user)
         loop = asyncio.get_running_loop()
         query = raw_query.decode("utf-8")
         logger.info("HTTP Query: %s", query)
@@ -111,17 +111,14 @@ def quacko(
 
 def _convert_query_result(qr: QueryResult):
     # Special handling for DESCRIBE-style results for reasons
-    if (
-        qr.column_count() == 6
-        and qr.column(0)[0] == "column_name"
-        and qr.column(1)[0] == "column_type"
-    ):
-        logger.info("Performing DESCRIBE conversion on QueryResults")
-        cols = type_mapping.DESCRIBE_COLUMNS
-        data = []
-        for r in qr.rows():
-            data.append([r[0], r[1], "", ""])
-        return cols, data, None
+    if qr.column_count() == 6:
+        if qr.column(0)[0] == "column_name" and qr.column(1)[0] == "column_type":
+            logger.info("Performing DESCRIBE conversion on QueryResults")
+            cols = type_mapping.DESCRIBE_COLUMNS
+            data = []
+            for r in qr.rows():
+                data.append([r[0], r[1], "", ""])
+            return cols, data, None
 
     cols, converters = [], []
     for i in range(qr.column_count()):
