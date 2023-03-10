@@ -70,7 +70,11 @@ def quacko(
                 else:
                     qr = extension.apply(req.get("params"), h)
             else:
-                rewritten_query = rewriter.rewrite(query)
+                try:
+                    rewritten_query = rewriter.rewrite(query)
+                except Exception as e:
+                    logger.warning("sqlglot parse error: " + str(e))
+                    rewritten_query = query
                 qr = h.execute_sql(rewritten_query)
 
             logger.debug(

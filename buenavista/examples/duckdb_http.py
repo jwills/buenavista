@@ -93,13 +93,14 @@ def jdbc_procedures():
     """
 
 
-# Setup DuckDB file and FastAPI app with Presto API
-if os.getenv("DUCKDB_FILE"):
-    print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
-    db = duckdb.connect(os.getenv("DUCKDB_FILE"))
-else:
-    print("Using in-memory DuckDB")
-    db = duckdb.connect()
+if __name__ == "__main__":
+    # Setup DuckDB file and FastAPI app with Presto API
+    if os.getenv("DUCKDB_FILE"):
+        print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
+        db = duckdb.connect(os.getenv("DUCKDB_FILE"))
+    else:
+        print("Using in-memory DuckDB")
+        db = duckdb.connect()
 
-app = FastAPI()
-main.quacko(app, DuckDBConnection(db), rewriter)
+    app = FastAPI()
+    main.quacko(app, DuckDBConnection(db), rewriter)
