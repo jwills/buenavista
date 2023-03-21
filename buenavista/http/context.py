@@ -1,3 +1,4 @@
+import logging
 import queue
 import uuid
 from collections import defaultdict
@@ -7,6 +8,8 @@ from fastapi import Request
 
 from ..core import Connection, Session, QueryResult
 
+logger = logging.getLogger(__name__)
+
 
 class Headers:
     def __init__(self, req: Request):
@@ -14,17 +17,20 @@ class Headers:
         self.write = {}
 
     def get(self, name: str, default: Optional[Any] = None) -> Optional[Any]:
+        name = name.lower()
         return self.read.get(
-            f"X-Trino-{name}", self.read.get(f"X-Presto-{name}", default)
+            f"x-trino-{name}", self.read.get(f"x-presto-{name}", default)
         )
 
     def set(self, name: str, value: Any):
-        self.write[f"X-Trino-{name}"] = value
-        self.write[f"X-Presto-{name}"] = value
+        name = name.lower()
+        self.write[f"x-trino-{name}"] = value
+        self.write[f"x-presto-{name}"] = value
 
     def clear(self, name: str):
-        del self.write[f"X-Trino-{name}"]
-        del self.write[f"X-Presto-{name}"]
+        name = name.lower()
+        del self.write[f"x-trino-{name}"]
+        del self.write[f"x-presto-{name}"]
 
 
 class SessionPool:
@@ -55,6 +61,8 @@ class Context:
     def __init__(self, conn: Connection, req: Request):
         self.h = Headers(req)
         self.txn_id = self.h.get("Transaction-Id")
+        if self.txn_id == "NONE":
+            self.txn_id = None
         self.pool = self.POOLS[self.h.get("User", "default")]
         self._sess = self.pool.acquire(conn, self.txn_id)
 
@@ -74,13 +82,17 @@ class Context:
             self._sess.execute_sql(f"USE {use_target}")
 
     def execute_sql(self, sql: str) -> QueryResult:
+        logger.debug(f"TXN %s: %s", self.txn_id, sql)
         qr = self._sess.execute_sql(sql)
         ends_in_txn = self._sess.in_transaction()
+        logger.debug("FINISH IN TXN: %s", ends_in_txn)
         if not self.txn_id and ends_in_txn:
             self.txn_id = str(uuid.uuid4())
-            self.h.set("Start-Transaction-Id", self.txn_id)
+            self.h.set("Started-Transaction-Id", self.txn_id)
+            logger.debug("Set txn id to %s", self.txn_id)
         elif self.txn_id and not ends_in_txn:
             self.h.set("Clear-Transaction-Id", self.txn_id)
+            logger.debug("Cleared transaction id from %s", self.txn_id)
             self.txn_id = None
         return qr
 
