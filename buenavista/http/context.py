@@ -82,10 +82,14 @@ class Context:
         elif self.txn_id and not ends_in_txn:
             self.h.set("Clear-Transaction-Id", self.txn_id)
             self.txn_id = None
+        return qr
 
+    def close(self):
         self.pool.release(self._sess, self.txn_id)
         self._sess = None
-        return qr
+
+    def session(self) -> Session:
+        return self._sess
 
     def headers(self) -> Dict:
         return self.h.write

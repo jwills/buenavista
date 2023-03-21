@@ -99,6 +99,8 @@ def quacko(
                     elapsed_time_millis=(round(time.time() * 1000) - start),
                 ),
             )
+        finally:
+            ctx.close()
 
 
 def _convert_query_result(qr: QueryResult):
