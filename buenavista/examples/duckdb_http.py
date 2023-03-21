@@ -94,6 +94,8 @@ def jdbc_procedures():
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     # Setup DuckDB file and FastAPI app with Presto API
     if os.getenv("DUCKDB_FILE"):
         print("Loading DuckDB db: " + os.getenv("DUCKDB_FILE"))
@@ -102,5 +104,13 @@ if __name__ == "__main__":
         print("Using in-memory DuckDB")
         db = duckdb.connect()
 
+    bv_host = "127.0.0.1"
+    bv_port = 8080
+    if "BUENAVISTA_HOST" in os.environ:
+        bv_host = os.environ["BUENAVISTA_HOST"]
+    if "BUENAVISTA_PORT" in os.environ:
+        bv_port = int(os.environ["BUENAVISTA_PORT"])
+
     app = FastAPI()
     main.quacko(app, DuckDBConnection(db), rewriter)
+    uvicorn.run(app, host=bv_host, port=bv_port, log_level="info")

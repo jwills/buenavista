@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import functools
 import logging
-import os
 import time
 from typing import List, Optional
 
@@ -10,7 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from . import schemas, type_mapping
+from . import context, schemas, type_mapping
 from ..core import Connection, Extension, Session, QueryResult
 from ..rewrite import Rewriter
 
@@ -26,7 +25,6 @@ def quacko(
     pool = concurrent.futures.ThreadPoolExecutor()
     start_time = time.time()
     extensions_lookup = {e.type(): e for e in extensions}
-    sessions = {}
 
     @app.get("/v1/info")
     async def info():
@@ -42,23 +40,17 @@ def quacko(
     @app.post("/v1/statement")
     async def statement(req: Request) -> Response:
         # TODO: check user, do stuff with it
-        user = req.headers.get(
-            "X-Trino-User", req.headers.get("X-Presto-User", "default")
-        )
-        sess = sessions.get(user)
-        if not sess:
-            sess = conn.create_session()
-            sessions[user] = sess
+        ctxt = context.Context(conn, req)
         raw_query = await req.body()
-        loop = asyncio.get_running_loop()
         query = raw_query.decode("utf-8")
         logger.info("HTTP Query: %s", query)
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
-            pool, functools.partial(_execute, sess, query)
+            pool, functools.partial(_execute, ctxt, query)
         )
-        return JSONResponse(content=jsonable_encoder(result))
+        return JSONResponse(content=jsonable_encoder(result), headers=ctxt.headers())
 
-    def _execute(h: Session, query: str) -> schemas.BaseResult:
+    def _execute(ctx: context.Context, query: str) -> schemas.BaseResult:
         start = round(time.time() * 1000)
         id = f"{start_time}_{start}"
         try:
@@ -68,14 +60,14 @@ def quacko(
                 if not extension:
                     raise Exception("Unknown method: " + str(method))
                 else:
-                    qr = extension.apply(req.get("params"), h)
+                    qr = extension.apply(req.get("params"), ctx.session())
             else:
                 try:
                     rewritten_query = rewriter.rewrite(query)
                 except Exception as e:
                     logger.warning("sqlglot parse error: " + str(e))
                     rewritten_query = query
-                qr = h.execute_sql(rewritten_query)
+                qr = ctx.execute_sql(rewritten_query)
 
             logger.debug(
                 f"Query %s has %d columns in response", query, qr.column_count()
