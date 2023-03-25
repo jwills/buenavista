@@ -27,7 +27,7 @@ class Rewriter:
                 ret.append(self.rewrite_one(stmt))
             return ";\n".join(self._write.generate(s) for s in ret)
         except:
-            #TODO: log this
+            # TODO: log this
             return sql
 
     def rewrite_one(self, expression: exp.Expression) -> exp.Expression:
