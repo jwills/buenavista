@@ -62,12 +62,9 @@ def quacko(
                 else:
                     qr = extension.apply(req.get("params"), ctx.session())
             else:
-                try:
-                    rewritten_query = rewriter.rewrite(query)
-                except Exception as e:
-                    logger.warning("sqlglot parse error: " + str(e))
-                    rewritten_query = query
-                qr = ctx.execute_sql(rewritten_query)
+                if rewriter:
+                    query = rewriter.rewrite(query)
+                qr = ctx.execute_sql(query)
 
             logger.debug(
                 f"Query %s has %d columns in response", query, qr.column_count()
