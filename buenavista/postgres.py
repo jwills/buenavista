@@ -54,6 +54,7 @@ class ClientCommand:
     FLUSH = b"H"
     QUERY = b"Q"
     PARSE = b"P"
+    PASSWORD_MESSAGE = b"p"
     SYNC = b"S"
     TERMINATE = b"X"
 
@@ -222,6 +223,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
                 if type_code == ClientCommand.QUERY:
                     self.handle_query(ctx, payload)
+                elif type_code == ClientCommand.PASSWORD_MESSAGE:
+                    self.handle_plaintext_password(ctx, payload)
                 elif type_code == ClientCommand.PARSE:
                     self.handle_parse(ctx, payload)
                 elif type_code == ClientCommand.BIND:
@@ -262,10 +265,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             params = dict(zip(msg[::2], msg[1::2]))
             logger.info("Client connection params: %s", params)
             ctx = BVContext(conn.create_session(), self.server.rewriter, params)
-            self.send_authentication_ok()
-            self.send_parameter_status(conn.parameters())
-            self.send_backend_key_data(ctx)
-            self.send_ready_for_query(ctx)
+            self.send_authentication_password_request()
             return ctx
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
@@ -316,6 +316,18 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         logger.debug("Parsed statement: %s", sql)
         ctx.add_statement(stmt, sql)
         self.send_parse_complete()
+
+    def handle_plaintext_password(self, ctx: BVContext, payload: bytes):
+        logger.debug("Reviewing password")
+        password = payload.decode("utf-8").rstrip("\x00")
+        if password == os.environ["BUENAVISTA_PASSWORD"]:
+            self.send_authentication_ok()
+            self.send_parameter_status(self.server.conn.parameters())
+            self.send_backend_key_data(ctx)
+            self.send_ready_for_query(ctx)
+        else:
+            logger.error("Incorrect password")
+            self.send_error("Incorrect password", ctx)
 
     def handle_bind(self, ctx: BVContext, payload: bytes):
         logger.debug("Handling bind")
@@ -472,6 +484,11 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def send_notice(self):
         self.wfile.write(ServerResponse.NOTICE_RESPONSE)
+
+    def send_authentication_password_request(self):
+        self.wfile.write(
+            struct.pack("!cii", ServerResponse.AUTHENTICATION_REQUEST, 8, 3)
+        )
 
     def send_authentication_ok(self):
         self.wfile.write(
