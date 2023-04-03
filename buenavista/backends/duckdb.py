@@ -200,6 +200,9 @@ class DuckDBSession(Session):
         else:
             self._cursor.execute(sql)
 
+        if status:
+            return DuckDBQueryResult(status=status)
+
         rb = None
         if self._cursor.description:
             if "load " in lsql:
