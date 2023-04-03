@@ -20,11 +20,15 @@ class Rewriter:
         return decorator
 
     def rewrite(self, sql: str) -> str:
-        stmts = self._read.parse(sql)
-        ret = []
-        for stmt in stmts:
-            ret.append(self.rewrite_one(stmt))
-        return ";\n".join(self._write.generate(s) for s in ret)
+        try:
+            stmts = self._read.parse(sql)
+            ret = []
+            for stmt in stmts:
+                ret.append(self.rewrite_one(stmt))
+            return ";\n".join(self._write.generate(s) for s in ret)
+        except:
+            # TODO: log this
+            return sql
 
     def rewrite_one(self, expression: exp.Expression) -> exp.Expression:
         def _expand(node: exp.Expression):

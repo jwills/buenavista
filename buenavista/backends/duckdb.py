@@ -200,19 +200,16 @@ class DuckDBSession(Session):
         else:
             self._cursor.execute(sql)
 
+        if status:
+            return DuckDBQueryResult(status=status)
+
         rb = None
         if self._cursor.description:
-            if (
-                "select" in lsql
-                or "with" in lsql
-                or "describe" in lsql
-                or "show" in lsql
-                or "execute" in lsql
-            ):
-                rb = self._cursor.fetch_record_batch()
-            elif "load " in lsql:
+            if "load " in lsql:
                 self.refresh_config()
                 status = "LOAD"
+            elif not ("insert " in lsql or "update " in lsql or "delete " in lsql):
+                rb = self._cursor.fetch_record_batch()
         return DuckDBQueryResult(rb, status)
 
 
