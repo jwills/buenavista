@@ -20,6 +20,9 @@ class BVType(enum.Enum):
     TIME = 11
     TIMESTAMP = 12
     UNKNOWN = 13
+    ARRAY = 14
+    INTEGERARRAY = 15
+    STRINGARRAY = 16
 
 
 class QueryResult:

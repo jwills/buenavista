@@ -1,10 +1,9 @@
 import logging
-import os
 import re
 from typing import Dict, Iterator, List, Optional, Tuple
 
-import duckdb
 import pyarrow as pa
+import sqlglot
 
 from buenavista.core import BVType, Connection, QueryResult, Session
 
@@ -13,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def to_bvtype(t: pa.DataType) -> BVType:
-    if pa.types.is_boolean(t):
-        return BVType.BOOL
-    elif pa.types.is_int64(t):
+    if pa.types.is_int64(t):
         return BVType.BIGINT
     elif pa.types.is_integer(t):
         return BVType.INTEGER
@@ -33,11 +30,22 @@ def to_bvtype(t: pa.DataType) -> BVType:
         return BVType.DECIMAL
     elif pa.types.is_binary(t):
         return BVType.BYTES
+    elif pa.types.is_boolean(t):
+        return BVType.BOOL
     elif pa.types.is_interval(t):
         return BVType.INTERVAL
-    elif pa.types.is_list(t) or pa.types.is_struct(t) or pa.types.is_map(t):
+    elif pa.types.is_list(t):
+        field_type = t.field(0).type
+        if pa.types.is_integer(field_type):
+            return BVType.INTEGERARRAY
+        elif pa.types.is_string(field_type):
+            return BVType.STRINGARRAY
+        else:
+            # TODO: detailed nested types
+            return BVType.ARRAY
+    elif pa.types.is_struct(t) or pa.types.is_map(t):
         # TODO: support detailed nested types
-        return BVType.TEXT
+        return BVType.JSON
     else:
         return BVType.UNKNOWN
 
@@ -177,7 +185,13 @@ class DuckDBSession(Session):
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
         status = ""
-        lsql = sql.lower()
+        try:
+            lsql = sqlglot.parse_one(sql).sql(comments=False)
+        except:
+            # TODO: log this
+            lsql = sql
+
+        lsql = lsql.lower()
         if self.in_txn:
             if "commit" in lsql:
                 self.in_txn = False

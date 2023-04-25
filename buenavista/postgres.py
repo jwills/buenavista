@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import random
-import re
 import socketserver
 import struct
 from typing import Dict, List, Optional
@@ -61,18 +60,21 @@ class ClientCommand:
 PG_UNKNOWN = (705, str)
 BVTYPE_TO_PGTYPE = {
     BVType.NULL: (-1, lambda v: None),
+    BVType.ARRAY: (2277, lambda v: "{" + ",".join(v) + "}"),
     BVType.BIGINT: (20, str),
     BVType.BOOL: (16, lambda v: "true" if v else "false"),
     BVType.BYTES: (17, lambda v: "\\x" + v.hex()),
     BVType.DATE: (1082, lambda v: v.isoformat()),
+    BVType.DECIMAL: (1700, str),
     BVType.FLOAT: (701, str),
     BVType.INTEGER: (23, str),
+    BVType.INTEGERARRAY: (1007, lambda v: "{" + ",".join(v) + "}"),
     BVType.INTERVAL: (
         1186,
         lambda v: f"{v.days} days {v.seconds} seconds {v.microseconds} microseconds",
     ),
     BVType.JSON: (114, lambda v: json.dumps(v)),
-    BVType.DECIMAL: (1700, str),
+    BVType.STRINGARRAY: (1009, lambda v: "{" + ",".join(v) + "}"),
     BVType.TEXT: (25, str),
     BVType.TIME: (1083, lambda v: v.isoformat()),
     BVType.TIMESTAMP: (1114, lambda v: v.isoformat().replace("T", " ")),
