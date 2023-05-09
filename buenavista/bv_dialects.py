@@ -2,6 +2,7 @@ from sqlglot import exp
 from sqlglot.dialects import DuckDB, Postgres, Trino
 from sqlglot.tokens import TokenType
 
+
 # Additional expressions I need
 class ToISO8601(exp.Func):
     pass

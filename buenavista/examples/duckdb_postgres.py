@@ -18,7 +18,6 @@ rewriter = DuckDBPostgresRewriter(bv_dialects.BVPostgres(), bv_dialects.BVDuckDB
 
 
 if __name__ == "__main__":
-
     if len(sys.argv) < 2:
         print("Using in-memory DuckDB database")
         db = duckdb.connect()
