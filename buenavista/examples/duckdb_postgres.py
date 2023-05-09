@@ -36,7 +36,9 @@ if __name__ == "__main__":
 
     address = (bv_host, bv_port)
 
-    server = postgres.BuenaVistaServer(address, DuckDBConnection(db), rewriter=rewriter)
+    server = postgres.BuenaVistaServer(
+        address, DuckDBConnection(db), rewriter=rewriter, auth=None
+    )
     ip, port = server.server_address
     print(f"Listening on {ip}:{port}")
 
