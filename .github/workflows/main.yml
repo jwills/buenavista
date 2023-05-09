@@ -1,4 +1,4 @@
-name: Python application test
+name: Buena Vista Unit Tests
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.8, 3.9, 3.10]
+        python-version: ['3.8', '3.9', '3.10']
 
     steps:
     - name: Check out repository
