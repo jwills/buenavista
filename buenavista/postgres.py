@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import logging
@@ -53,6 +54,7 @@ class ClientCommand:
     FLUSH = b"H"
     QUERY = b"Q"
     PARSE = b"P"
+    PASSWORD_MESSAGE = b"p"
     SYNC = b"S"
     TERMINATE = b"X"
 
@@ -142,6 +144,14 @@ class BVContext:
         self.portals = {}
         self.result_cache = {}
         self.has_error = False
+        self.authenticated = False
+        self.salt = None
+
+    def get_hashed_password(self, auth: dict) -> str:
+        user = self.params["user"]
+        password = auth[user]
+        first = hashlib.md5(password.encode("utf-8") + user.encode("utf-8")).hexdigest()
+        return "md5" + hashlib.md5(first.encode("utf-8") + self.salt).hexdigest()
 
     def mark_error(self):
         self.has_error = True
@@ -222,7 +232,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 else:
                     payload = None
 
-                if type_code == ClientCommand.QUERY:
+                if not ctx.authenticated:
+                    if type_code == ClientCommand.PASSWORD_MESSAGE:
+                        self.handle_md5_password(ctx, payload)
+                    else:
+                        raise Exception("Not authenticated")
+                elif type_code == ClientCommand.QUERY:
                     self.handle_query(ctx, payload)
                 elif type_code == ClientCommand.PARSE:
                     self.handle_parse(ctx, payload)
@@ -264,10 +279,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             params = dict(zip(msg[::2], msg[1::2]))
             logger.info("Client connection params: %s", params)
             ctx = BVContext(conn.create_session(), self.server.rewriter, params)
-            self.send_authentication_ok()
-            self.send_parameter_status(conn.parameters())
-            self.send_backend_key_data(ctx)
-            self.send_ready_for_query(ctx)
+            self.send_auth_request(ctx)
             return ctx
         elif code == 80877102:  ## Cancel request
             process_id, secret_key = self.r.read_uint32(), self.r.read_uint32()
@@ -279,6 +291,41 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return None
         else:
             raise Exception(f"Unsupported startup message: {code}")
+
+    def send_auth_request(self, ctx: BVContext):
+        if self.server.auth is None:
+            self.send_authentication_ok()
+            self.handle_post_auth(ctx)
+        else:
+            self.send_authentication_md5(ctx)
+
+    def send_authentication_ok(self):
+        self.wfile.write(
+            struct.pack("!cii", ServerResponse.AUTHENTICATION_REQUEST, 8, 0)
+        )
+
+    def send_authentication_md5(self, ctx: BVContext):
+        ctx.salt = os.urandom(4)
+        self.wfile.write(
+            struct.pack("!cii", ServerResponse.AUTHENTICATION_REQUEST, 12, 5)
+        )
+        self.wfile.write(ctx.salt)
+
+    def handle_md5_password(self, ctx: BVContext, payload: bytes):
+        client_side = payload.decode("utf-8").rstrip("\x00")
+        server_side = ctx.get_hashed_password(self.server.auth)
+        if client_side == server_side:
+            self.send_authentication_ok()
+            self.handle_post_auth(ctx)
+        else:
+            self.send_error("Invalid password")
+
+    def handle_post_auth(self, ctx: BVContext):
+        self.send_parameter_status(self.server.conn.parameters())
+        self.send_backend_key_data(ctx)
+        self.send_ready_for_query(ctx)
+        ctx.authenticated = True
+        return
 
     def handle_query(self, ctx: BVContext, payload: bytes):
         logger.debug("Handle query")
@@ -475,11 +522,6 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
     def send_notice(self):
         self.wfile.write(ServerResponse.NOTICE_RESPONSE)
 
-    def send_authentication_ok(self):
-        self.wfile.write(
-            struct.pack("!cii", ServerResponse.AUTHENTICATION_REQUEST, 8, 0)
-        )
-
     def send_backend_key_data(self, ctx):
         self.wfile.write(
             struct.pack(
@@ -536,12 +578,14 @@ class BuenaVistaServer(socketserver.ThreadingTCPServer):
         *,
         rewriter: Optional[Rewriter] = None,
         extensions: List[Extension] = [],
+        auth: Optional[Dict[str, str]] = None,
     ):
         super().__init__(server_address, BuenaVistaHandler)
         self.conn = conn
         self.rewriter = rewriter
         self.extensions = {e.type(): e for e in extensions}
         self.ctxts = {}
+        self.auth = auth
 
     def verify_request(self, request, client_address) -> bool:
         """Ensure all requests come from localhost until auth is in place"""

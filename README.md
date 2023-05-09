@@ -13,7 +13,7 @@ that illustrates the idea locally:
 
 ```sh
 pip3 install buenavista
-python3 -m buenavista.backends.duckdb <optional_duckdb_file>
+python3 -m buenavista.examples.duckdb_postgres <optional_duckdb_file>
 ```
 
 in order to start a Postgres server on `localhost:5433` backed by the DuckDB database file that you passed in at the command line
