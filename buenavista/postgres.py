@@ -155,10 +155,10 @@ class BVContext:
         return TransactionStatus.IDLE
 
     def execute_sql(self, sql: str, params=None) -> QueryResult:
-        print("Input SQL: " + sql)
+        logger.info("Input SQL: " + sql)
         if self.rewriter:
             sql = self.rewriter.rewrite(sql)
-            print("Rewritten SQL: " + sql)
+            logger.info("Rewritten SQL: " + sql)
         return self.session.execute_sql(sql, params)
 
     def describe_portal(self, name: str) -> QueryResult:
