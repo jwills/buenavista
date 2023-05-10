@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Tuple
 
 import duckdb
 
@@ -9,12 +10,22 @@ from .. import bv_dialects, postgres, rewrite
 
 class DuckDBPostgresRewriter(rewrite.Rewriter):
     def rewrite(self, sql: str) -> str:
-        if sql == "select pg_catalog.version()":
+        if sql.lower() == "select pg_catalog.version()":
             return "SELECT 'PostgreSQL 9.3' as version"
-        return super().rewrite(sql)
+        else:
+            return super().rewrite(sql)
 
 
 rewriter = DuckDBPostgresRewriter(bv_dialects.BVPostgres(), bv_dialects.BVDuckDB())
+
+
+def create(
+    db: duckdb.DuckDBPyConnection, host_addr: Tuple[str, int], auth: dict = None
+) -> postgres.BuenaVistaServer:
+    server = postgres.BuenaVistaServer(
+        host_addr, DuckDBConnection(db), rewriter=rewriter, auth=auth
+    )
+    return server
 
 
 if __name__ == "__main__":
@@ -35,10 +46,7 @@ if __name__ == "__main__":
         bv_port = int(os.environ["BUENAVISTA_PORT"])
 
     address = (bv_host, bv_port)
-
-    server = postgres.BuenaVistaServer(
-        address, DuckDBConnection(db), rewriter=rewriter, auth=None
-    )
+    server = create(db, address)
     ip, port = server.server_address
     print(f"Listening on {ip}:{port}")
 
