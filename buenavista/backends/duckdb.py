@@ -206,9 +206,9 @@ class DuckDBSession(Session):
             self.in_txn = True
             status = "BEGIN"
 
-        logger.debug("Original SQL: ", sql)
+        logger.debug("Original SQL: %s", sql)
         sql = self.rewrite_sql(sql)
-        logger.debug("Rewritten SQL: ", sql)
+        logger.debug("Rewritten SQL: %s", sql)
         if params:
             self._cursor.execute(sql, params)
         else:
