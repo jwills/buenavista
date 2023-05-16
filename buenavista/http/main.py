@@ -87,7 +87,7 @@ def quacko(
                 id=id,
                 info_uri="http://127.0.0.1/info",
                 error=schemas.QueryError(
-                    message=str(e),
+                    message=f"Received error '{e}' executing query {query}",
                     error_code=-1,
                     retriable=False,
                 ),
