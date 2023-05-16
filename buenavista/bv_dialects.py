@@ -45,31 +45,51 @@ def _duckdb_command_handler(self, expression):
         entity = tokens[0].upper()
         if entity == "CATALOGS":
             q = "SELECT DISTINCT catalog_name as Catalog FROM information_schema.schemata"
-            if len(tokens) == 3:
-                q += " WHERE catalog_name LIKE " + tokens[2]
+            if len(tokens) >= 3:
+                if len(tokens) == 5:
+                    like = tokens[2].replace(tokens[4], "")
+                else:
+                    like = tokens[2]
+                q += " WHERE catalog_name LIKE " + like
             else:
                 return q
         elif entity == "SCHEMAS":
             q = "SELECT DISTINCT schema_name as Schema FROM information_schema.schemata"
             if len(tokens) > 1 and tokens[1].upper() == "FROM":
                 q += f" WHERE catalog_name = '{tokens[2]}'"
-                if len(tokens) == 5:
-                    q += " AND schema_name LIKE " + tokens[4]
+                if len(tokens) >= 5:
+                    if len(tokens) == 7:
+                        like = tokens[4].replace(tokens[6], "")
+                    else:
+                        like = tokens[4]
+                    q += " AND schema_name LIKE " + like
             else:
                 q += " WHERE catalog_name IN (SELECT current_database())"
-                if len(tokens) == 3:
-                    q += " AND schema_name LIKE " + tokens[2]
+                if len(tokens) >= 3:
+                    if len(tokens) == 5:
+                        like = tokens[2].replace(tokens[4], "")
+                    else:
+                        like = tokens[2]
+                    q += " AND schema_name LIKE " + like
             return q
         elif entity == "TABLES":
             q = "SELECT DISTINCT table_name as Table from information_schema.tables"
             if len(tokens) > 1 and tokens[1].upper() == "FROM":
                 q += f" WHERE schema_name = '{tokens[2]}'"
-                if len(tokens) == 5:
-                    q += " AND table_name LIKE " + tokens[4]
+                if len(tokens) >= 5:
+                    if len(tokens) == 7:
+                        like = tokens[4].replace(tokens[6], "")
+                    else:
+                        like = tokens[4]
+                    q += " AND table_name LIKE " + like
             else:
                 q += " WHERE catalog_name IN (SELECT current_schema())"
-                if len(tokens) == 3:
-                    q += " AND table_name LIKE " + tokens[2]
+                if len(tokens) >= 3:
+                    if len(tokens) == 5:
+                        like = tokens[2].replace(tokens[4], "")
+                    else:
+                        like = tokens[2]
+                    q += " AND table_name LIKE " + like
             return q
         elif entity == "COLUMNS" and tokens[1].upper() == "FROM":
             return f"DESCRIBE {tokens[2]}"
