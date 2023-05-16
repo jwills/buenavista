@@ -1,4 +1,5 @@
 import os
+import re
 
 import duckdb
 from fastapi import FastAPI
@@ -8,7 +9,25 @@ from ..backends.duckdb import DuckDBConnection
 from ..http import main
 
 #### Rewriter setup/config
-rewriter = rewrite.Rewriter(bv_dialects.BVTrino(), bv_dialects.BVDuckDB())
+
+ESCAPE_PATTERN = re.compile(r"LIKE (\S+) ESCAPE (\S+)")
+
+
+def _escape_replace(match):
+    token = match.group(1)
+    escape = match.group(2).strip("'") or "\\"
+    return "LIKE " + token.replace(escape, "")
+
+
+class DuckDBHTTPRewriter(rewrite.Rewriter):
+    def rewrite(self, sql: str) -> str:
+        sql = super().rewrite(sql)
+        sql = ESCAPE_PATTERN.sub(_escape_replace, sql)
+        print("Rewritten to %s" % sql)
+        return sql
+
+
+rewriter = DuckDBHTTPRewriter(bv_dialects.BVTrino(), bv_dialects.BVDuckDB())
 
 
 @rewriter.relation("system.jdbc.tables")
