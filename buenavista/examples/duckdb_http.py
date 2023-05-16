@@ -23,7 +23,6 @@ class DuckDBHTTPRewriter(rewrite.Rewriter):
     def rewrite(self, sql: str) -> str:
         sql = super().rewrite(sql)
         sql = ESCAPE_PATTERN.sub(_escape_replace, sql)
-        print("Rewritten to %s" % sql)
         return sql
 
 
