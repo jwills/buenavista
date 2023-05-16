@@ -44,16 +44,33 @@ def _duckdb_command_handler(self, expression):
         tokens = literal.split()
         entity = tokens[0].upper()
         if entity == "CATALOGS":
-            return "SELECT DISTINCT catalog_name as Catalog FROM information_schema.schemata"
-            # TODO: LIKE
+            q = "SELECT DISTINCT catalog_name as Catalog FROM information_schema.schemata"
+            if len(tokens) == 3:
+                q += " WHERE catalog_name LIKE " + tokens[2]
+            else:
+                return q
         elif entity == "SCHEMAS":
-            return (
-                "SELECT DISTINCT schema_name as Schema FROM information_schema.schemata"
-            )
-            # TODO: LIKE
+            q = "SELECT DISTINCT schema_name as Schema FROM information_schema.schemata"
+            if len(tokens) > 1 and tokens[1].upper() == "FROM":
+                q += f" WHERE catalog_name = '{tokens[2]}'"
+                if len(tokens) == 5:
+                    q += " AND schema_name LIKE " + tokens[4]
+            else:
+                q += " WHERE catalog_name IN (SELECT current_database())"
+                if len(tokens) == 3:
+                    q += " AND schema_name LIKE " + tokens[2]
+            return q
         elif entity == "TABLES":
-            return "SELECT DISTINCT table_name as Table from information_schema.tables"
-            # TODO: LIKE
+            q = "SELECT DISTINCT table_name as Table from information_schema.tables"
+            if len(tokens) > 1 and tokens[1].upper() == "FROM":
+                q += f" WHERE schema_name = '{tokens[2]}'"
+                if len(tokens) == 5:
+                    q += " AND table_name LIKE " + tokens[4]
+            else:
+                q += " WHERE catalog_name IN (SELECT current_schema())"
+                if len(tokens) == 3:
+                    q += " AND table_name LIKE " + tokens[2]
+            return q
         elif entity == "COLUMNS" and tokens[1].upper() == "FROM":
             return f"DESCRIBE {tokens[2]}"
         elif entity == "TRANSACTION":

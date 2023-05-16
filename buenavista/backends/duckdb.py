@@ -16,7 +16,7 @@ def to_bvtype(t: pa.DataType) -> BVType:
         return BVType.BIGINT
     elif pa.types.is_integer(t):
         return BVType.INTEGER
-    elif pa.types.is_string(t):
+    elif pa.types.is_string(t) or pa.types.is_large_string(t):
         return BVType.TEXT
     elif pa.types.is_date(t):
         return BVType.DATE
@@ -47,7 +47,7 @@ def to_bvtype(t: pa.DataType) -> BVType:
         # TODO: support detailed nested types
         return BVType.JSON
     else:
-        return BVType.UNKNOWN
+        raise Exception("Could not convert DuckDB type: " + str(t))
 
 
 class RecordBatchIterator(Iterator[List[Optional[str]]]):

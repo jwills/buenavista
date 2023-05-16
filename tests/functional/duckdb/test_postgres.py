@@ -29,6 +29,7 @@ def duckdb_postgres_server(db, user_password):
     finally:
         db.close()
 
+
 @pytest.fixture(scope="session")
 def conn(duckdb_postgres_server, user_password):
     assert duckdb_postgres_server is not None
@@ -42,6 +43,7 @@ def test_select(conn):
     cur.execute("SELECT 1")
     assert cur.fetchone() == (1,)
     cur.close()
+
 
 def test_pg_version(conn):
     cur = conn.cursor()
