@@ -46,7 +46,7 @@ TYPE_MAPPING = {
 
 
 def type_converter(bvtype: BVType) -> Callable:
-    if bvtype == BVType.DECIMAL:
+    if bvtype in (BVType.DECIMAL, BVType.TIMESTAMP, BVType.TIME, BVType.DATE):
         return lambda x: str(x) if x else None
     return lambda x: x
 

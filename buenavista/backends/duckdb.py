@@ -42,7 +42,7 @@ def to_bvtype(t: pa.DataType) -> BVType:
             return BVType.STRINGARRAY
         else:
             # TODO: detailed nested types
-            return BVType.ARRAY
+            return BVType.JSON
     elif pa.types.is_struct(t) or pa.types.is_map(t):
         # TODO: support detailed nested types
         return BVType.JSON

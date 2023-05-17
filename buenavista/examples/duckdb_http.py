@@ -111,6 +111,33 @@ def jdbc_procedures():
     """
 
 
+@rewriter.relation("system.jdbc.procedure_columns")
+def jdbc_procedure_columns():
+    return """
+        SELECT CAST(NULL AS VARCHAR) as procedure_cat
+        , CAST(NULL AS VARCHAR) as procedure_schem
+        , CAST(NULL AS VARCHAR) as procedure_name
+        , CAST(NULL AS VARCHAR) as column_name
+        , CAST(NULL AS BIGINT) as column_type
+        , CAST(NULL AS BIGINT) as data_type
+        , CAST(NULL AS VARCHAR) as type_name
+        , CAST(NULL AS BIGINT) as precision
+        , CAST(NULL AS BIGINT) as length
+        , CAST(NULL AS BIGINT) as scale
+        , CAST(NULL AS BIGINT) as radix
+        , CAST(NULL AS BIGINT) as nullable
+        , CAST(NULL AS VARCHAR) as remarks
+        , CAST(NULL AS VARCHAR) as column_def
+        , CAST(NULL AS BIGINT) as sql_data_type
+        , CAST(NULL AS BIGINT) as sql_datetime_sub
+        , CAST(NULL AS BIGINT) as char_octet_length
+        , CAST(NULL AS BIGINT) as ordinal_position
+        , CAST(NULL AS VARCHAR) as is_nullable
+        , CAST(NULL AS VARCHAR) as specific_name
+        WHERE false
+    """
+
+
 if __name__ == "__main__":
     import uvicorn
 
