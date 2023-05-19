@@ -26,7 +26,7 @@ def duckdb_postgres_server(db, user_password):
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.daemon = True
         server_thread.start()
-        time.sleep(1) # wait for server to start
+        time.sleep(1)  # wait for server to start
         yield server
     finally:
         db.close()

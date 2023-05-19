@@ -64,7 +64,7 @@ def jdbc_catalogs():
 
 @rewriter.relation("system.jdbc.table_types")
 def jdbc_table_types():
-    return "SELECT * FROM VALUES ('TABLE'), ('VIEW') AS t(table_type)"
+    return "SELECT * FROM VALUES ('BASE TABLE'), ('VIEW') AS t(table_type)"
 
 
 @rewriter.relation("system.jdbc.columns")
@@ -106,6 +106,33 @@ def jdbc_procedures():
         , CAST(NULL AS VARCHAR) as procedure_name
         , CAST(NULL AS VARCHAR) as remarks
         , CAST(NULL AS BIGINT) as procedure_type
+        , CAST(NULL AS VARCHAR) as specific_name
+        WHERE false
+    """
+
+
+@rewriter.relation("system.jdbc.procedure_columns")
+def jdbc_procedure_columns():
+    return """
+        SELECT CAST(NULL AS VARCHAR) as procedure_cat
+        , CAST(NULL AS VARCHAR) as procedure_schem
+        , CAST(NULL AS VARCHAR) as procedure_name
+        , CAST(NULL AS VARCHAR) as column_name
+        , CAST(NULL AS BIGINT) as column_type
+        , CAST(NULL AS BIGINT) as data_type
+        , CAST(NULL AS VARCHAR) as type_name
+        , CAST(NULL AS BIGINT) as precision
+        , CAST(NULL AS BIGINT) as length
+        , CAST(NULL AS BIGINT) as scale
+        , CAST(NULL AS BIGINT) as radix
+        , CAST(NULL AS BIGINT) as nullable
+        , CAST(NULL AS VARCHAR) as remarks
+        , CAST(NULL AS VARCHAR) as column_def
+        , CAST(NULL AS BIGINT) as sql_data_type
+        , CAST(NULL AS BIGINT) as sql_datetime_sub
+        , CAST(NULL AS BIGINT) as char_octet_length
+        , CAST(NULL AS BIGINT) as ordinal_position
+        , CAST(NULL AS VARCHAR) as is_nullable
         , CAST(NULL AS VARCHAR) as specific_name
         WHERE false
     """
