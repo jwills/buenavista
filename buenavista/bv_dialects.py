@@ -75,7 +75,7 @@ def _duckdb_command_handler(self, expression):
         elif entity == "TABLES":
             q = "SELECT DISTINCT table_name as Table from information_schema.tables"
             if len(tokens) > 1 and tokens[1].upper() == "FROM":
-                q += f" WHERE schema_name = '{tokens[2]}'"
+                q += f" WHERE table_schema = '{tokens[2]}'"
                 if len(tokens) >= 5:
                     if len(tokens) == 7:
                         like = tokens[4].replace(tokens[6], "")
@@ -83,7 +83,7 @@ def _duckdb_command_handler(self, expression):
                         like = tokens[4]
                     q += " AND table_name LIKE " + like
             else:
-                q += " WHERE catalog_name IN (SELECT current_schema())"
+                q += " WHERE table_schema IN (SELECT current_schema())"
                 if len(tokens) >= 3:
                     if len(tokens) == 5:
                         like = tokens[2].replace(tokens[4], "")

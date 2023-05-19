@@ -64,7 +64,7 @@ def jdbc_catalogs():
 
 @rewriter.relation("system.jdbc.table_types")
 def jdbc_table_types():
-    return "SELECT * FROM VALUES ('TABLE'), ('VIEW') AS t(table_type)"
+    return "SELECT * FROM VALUES ('BASE TABLE'), ('VIEW') AS t(table_type)"
 
 
 @rewriter.relation("system.jdbc.columns")
