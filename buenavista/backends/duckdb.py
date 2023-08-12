@@ -79,6 +79,7 @@ class DuckDBQueryResult(QueryResult):
     def __init__(
         self, rbr: Optional[pa.RecordBatchReader] = None, status: Optional[str] = None
     ):
+        super().__init__()
         if rbr:
             self.rbr = rbr
             self.bvtypes = [to_bvtype(s.type) for s in rbr.schema]

@@ -62,14 +62,18 @@ class ClientCommand:
 PG_UNKNOWN = (705, str)
 BVTYPE_TO_PGTYPE = {
     BVType.NULL: (-1, lambda v: None),
-    BVType.ARRAY: (2277, lambda v: "{" + ",".join(v) + "}"),
-    BVType.BIGINT: (20, str),
-    BVType.BOOL: (16, lambda v: "true" if v else "false"),
-    BVType.BYTES: (17, lambda v: "\\x" + v.hex()),
-    BVType.DATE: (1082, lambda v: v.isoformat()),
+    BVType.ARRAY: (2277, lambda v: "{" + ",".join(v) + "}", None),
+    BVType.BIGINT: (20, str, lambda r: int.to_bytes(r, 8, "big")),
+    BVType.BOOL: (
+        16,
+        lambda v: "true" if v else "false",
+        lambda r: struct.pack("!?", r),
+    ),
+    BVType.BYTES: (17, lambda v: "\\x" + v.hex(), lambda r: r),
+    BVType.DATE: (1082, lambda v: v.isoformat(), lambda r: struct.pack("!i", r)),
     BVType.DECIMAL: (1700, str),
-    BVType.FLOAT: (701, str),
-    BVType.INTEGER: (23, str),
+    BVType.FLOAT: (701, str, lambda r: struct.pack("!d", r)),
+    BVType.INTEGER: (23, str, lambda r: int.to_bytes(r, 4, "big")),
     BVType.INTEGERARRAY: (1007, lambda v: "{" + ",".join(v) + "}"),
     BVType.INTERVAL: (
         1186,
@@ -77,9 +81,13 @@ BVTYPE_TO_PGTYPE = {
     ),
     BVType.JSON: (114, lambda v: json.dumps(v)),
     BVType.STRINGARRAY: (1009, lambda v: "{" + ",".join(v) + "}"),
-    BVType.TEXT: (25, str),
-    BVType.TIME: (1083, lambda v: v.isoformat()),
-    BVType.TIMESTAMP: (1114, lambda v: v.isoformat().replace("T", " ")),
+    BVType.TEXT: (25, str, lambda r: r.encode("utf-8")),
+    BVType.TIME: (1083, lambda v: v.isoformat(), lambda r: struct.pack("!q", r)),
+    BVType.TIMESTAMP: (
+        1114,
+        lambda v: v.isoformat().replace("T", " "),
+        lambda r: struct.pack("!q", r),
+    ),
 }
 
 
@@ -172,9 +180,10 @@ class BVContext:
         return self.session.execute_sql(sql, params)
 
     def describe_portal(self, name: str) -> QueryResult:
-        stmt, params = self.portals[name]
+        stmt, params, result_fmt = self.portals[name]
         sql = self.stmts[stmt]
         query_result = self.execute_sql(sql=sql, params=params)
+        query_result.result_format = result_fmt
         self.result_cache[name] = query_result
         return query_result
 
@@ -188,9 +197,11 @@ class BVContext:
             del self.result_cache[name]
             return query_result
         else:
-            stmt, params = self.portals[name]
+            stmt, params, result_fmt = self.portals[name]
             sql = self.stmts[stmt]
-            return self.execute_sql(sql=sql, params=params)
+            qr = self.execute_sql(sql=sql, params=params)
+            qr.result_format = result_fmt
+            return qr
 
     def add_statement(self, name: str, sql: str):
         self.stmts[name] = sql
@@ -198,8 +209,10 @@ class BVContext:
     def close_statement(self, name: str):
         del self.stmts[name]
 
-    def add_portal(self, name: str, stmt: str, params: Dict[str, str]):
-        self.portals[name] = (stmt, params)
+    def add_portal(
+        self, name: str, stmt: str, params: Dict[str, str], result_formats: list[int]
+    ):
+        self.portals[name] = (stmt, params, result_formats)
 
     def close_portal(self, name: str):
         del self.portals[name]
@@ -401,7 +414,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 # ints but I can live with it for now
                 params.append(int.from_bytes(v, "big"))
         logger.debug("Bind params: %s", params)
-        ctx.add_portal(portal, stmt, params)
+        # now expected result formats
+        num_result_formats = buf.read_int16()
+        result_formats = []
+        for i in range(num_result_formats):
+            result_formats.append(buf.read_int16())
+        ctx.add_portal(portal, stmt, params, result_formats)
         self.send_bind_complete()
 
     def handle_describe(self, ctx: BVContext, payload: bytes):
@@ -468,7 +486,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             name, bvtype = query_result.column(i)
             oid = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[0]
             buf.write_string(name)
-            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, 0))
+            fmt = query_result.result_format[i] if query_result.result_format else 0
+            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, fmt))
         out = buf.get_value()
         sig = struct.pack(
             "!cih",
@@ -483,16 +502,29 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         converters = []
         for i in range(query_result.column_count()):
             bvtype = query_result.column(i)[1]
-            converters.append(BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[1])
+            if query_result.result_format is None or query_result.result_format[i] == 0:
+                txt_fn = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[1]
+
+                def f(r, buf):
+                    v = txt_fn(r).encode("utf-8")
+                    buf.write_int32(len(v))
+                    buf.write_bytes(v)
+
+                converters.append(f)
+            else:
+                bin_fn = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[2]
+
+                def f(r, buf):
+                    buf.write_bytes(bin_fn(r))
+
+                converters.append(f)
         for row in query_result.rows():
             buf = BVBuffer()
             for i, r in enumerate(row):
                 if r is None:
                     buf.write_int32(-1)
                 else:
-                    v = converters[i](r).encode("utf-8")
-                    buf.write_int32(len(v))
-                    buf.write_bytes(v)
+                    converters[i](r, buf)
             out = buf.get_value()
             row_sig = struct.pack(
                 "!cih",
