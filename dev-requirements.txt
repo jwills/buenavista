@@ -3,5 +3,6 @@ fastapi[all]
 psycopg
 psycopg-pool
 pyarrow
+pydantic>=1.2.0,<2.0.0
 pytest
 sqlglot
