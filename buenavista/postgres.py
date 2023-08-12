@@ -210,7 +210,7 @@ class BVContext:
         del self.stmts[name]
 
     def add_portal(
-        self, name: str, stmt: str, params: Dict[str, str], result_formats: list[int]
+        self, name: str, stmt: str, params: Dict[str, str], result_formats: List[int]
     ):
         self.portals[name] = (stmt, params, result_formats)
 
