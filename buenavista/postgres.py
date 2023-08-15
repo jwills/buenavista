@@ -181,14 +181,16 @@ class BVContext:
 
     def describe_portal(self, name: str) -> QueryResult:
         stmt, params, result_fmt = self.portals[name]
-        sql = self.stmts[stmt]
+        sql, param_oids = self.stmts[stmt]
+        # todo: parse params? LIMIT 0?
         query_result = self.execute_sql(sql=sql, params=params)
         query_result.result_format = result_fmt
         self.result_cache[name] = query_result
         return query_result
 
     def describe_statement(self, name: str) -> QueryResult:
-        sql = self.stmts[name]
+        sql, param_oids = self.stmts[name]
+        # TODO: create default params from param_oids
         return self.execute_sql(sql)
 
     def execute_portal(self, name: str) -> QueryResult:
@@ -198,13 +200,14 @@ class BVContext:
             return query_result
         else:
             stmt, params, result_fmt = self.portals[name]
-            sql = self.stmts[stmt]
+            sql, param_oids = self.stmts[stmt]
+            # parse the params?
             qr = self.execute_sql(sql=sql, params=params)
             qr.result_format = result_fmt
             return qr
 
-    def add_statement(self, name: str, sql: str):
-        self.stmts[name] = sql
+    def add_statement(self, name: str, sql: str, param_oids: List[int]):
+        self.stmts[name] = (sql, param_oids)
 
     def close_statement(self, name: str):
         del self.stmts[name]
@@ -376,7 +379,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         query_idx = ba.index(NULL_BYTE, stmt_idx + 1)
         sql = ba[stmt_idx + 1 : query_idx].decode("utf-8")
         logger.debug("Parsed statement: %s", sql)
-        ctx.add_statement(stmt, sql)
+        buf = BVBuffer(io.BytesIO(ba[query_idx + 1 :]))
+        num_params = buf.read_int16()
+        param_oids = []
+        for i in range(num_params):
+            param_oids.append(buf.read_int32())
+        ctx.add_statement(stmt, sql, param_oids)
         self.send_parse_complete()
 
     def handle_bind(self, ctx: BVContext, payload: bytes):
