@@ -510,7 +510,7 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         converters = []
         for i in range(query_result.column_count()):
             bvtype = query_result.column(i)[1]
-            if query_result.result_format is None or query_result.result_format[i] == 0:
+            if not query_result.result_format or query_result.result_format[i] == 0:
                 txt_fn = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[1]
 
                 def f(r, buf):
