@@ -50,8 +50,9 @@ def test_bv_context_transaction_status(bv_context, mock_session):
 def test_bv_context_add_close_statement(bv_context):
     name = "stmt1"
     sql = "SELECT * FROM test;"
-    bv_context.add_statement(name, sql)
-    assert bv_context.stmts[name] == sql
+    param_oids = []
+    bv_context.add_statement(name, sql, param_oids)
+    assert bv_context.stmts[name] == (sql, param_oids)
 
     bv_context.close_statement(name)
     assert name not in bv_context.stmts
