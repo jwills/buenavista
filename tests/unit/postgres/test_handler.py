@@ -47,8 +47,8 @@ def test_handle_query(mock_handler):
 
 def test_handle_parse(mock_handler):
     ctx = MagicMock(spec=BVContext)
-    mock_handler.handle_parse(ctx, b"stmt1\x00SELECT 1;\x00")
-    ctx.add_statement.assert_called_once_with("stmt1", "SELECT 1;")
+    mock_handler.handle_parse(ctx, b"stmt1\x00SELECT 1;\x00\x00\x00")
+    ctx.add_statement.assert_called_once_with("stmt1", "SELECT 1;", [])
 
 
 # Add more test cases for other methods in the BuenaVistaHandler class

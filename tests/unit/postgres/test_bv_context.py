@@ -50,8 +50,9 @@ def test_bv_context_transaction_status(bv_context, mock_session):
 def test_bv_context_add_close_statement(bv_context):
     name = "stmt1"
     sql = "SELECT * FROM test;"
-    bv_context.add_statement(name, sql)
-    assert bv_context.stmts[name] == sql
+    param_oids = []
+    bv_context.add_statement(name, sql, param_oids)
+    assert bv_context.stmts[name] == (sql, param_oids)
 
     bv_context.close_statement(name)
     assert name not in bv_context.stmts
@@ -61,9 +62,9 @@ def test_bv_context_add_close_portal(bv_context):
     portal_name = "portal1"
     stmt_name = "stmt1"
     params = {"param1": "value1"}
-
-    bv_context.add_portal(portal_name, stmt_name, params)
-    assert bv_context.portals[portal_name] == (stmt_name, params)
+    result_fmt = [0]
+    bv_context.add_portal(portal_name, stmt_name, params, result_fmt)
+    assert bv_context.portals[portal_name] == (stmt_name, params, result_fmt)
 
     bv_context.close_portal(portal_name)
     assert portal_name not in bv_context.portals

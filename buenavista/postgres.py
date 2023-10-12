@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import io
 import json
@@ -59,17 +60,47 @@ class ClientCommand:
     TERMINATE = b"X"
 
 
+def _time_to_microseconds(t):
+    # Convert hours, minutes, seconds, and microseconds to microseconds
+    hours_to_microseconds = t.hour * 60 * 60 * 1e6
+    minutes_to_microseconds = t.minute * 60 * 1e6
+    seconds_to_microseconds = t.second * 1e6
+    microseconds = t.microsecond
+    total_microseconds = (
+        hours_to_microseconds
+        + minutes_to_microseconds
+        + seconds_to_microseconds
+        + microseconds
+    )
+    return int(total_microseconds)
+
+
+def _micros_since_2000(dt):
+    micros = (
+        dt - datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    ).total_seconds() * 1000000
+    return int(micros)
+
+
 PG_UNKNOWN = (705, str)
 BVTYPE_TO_PGTYPE = {
     BVType.NULL: (-1, lambda v: None),
-    BVType.ARRAY: (2277, lambda v: "{" + ",".join(v) + "}"),
-    BVType.BIGINT: (20, str),
-    BVType.BOOL: (16, lambda v: "true" if v else "false"),
-    BVType.BYTES: (17, lambda v: "\\x" + v.hex()),
-    BVType.DATE: (1082, lambda v: v.isoformat()),
+    BVType.ARRAY: (2277, lambda v: "{" + ",".join(v) + "}", None),
+    BVType.BIGINT: (20, str, lambda r: int.to_bytes(r, 8, "big")),
+    BVType.BOOL: (
+        16,
+        lambda v: "true" if v else "false",
+        lambda r: b"\x01" if r else b"\x00",
+    ),
+    BVType.BYTES: (17, lambda v: "\\x" + v.hex(), lambda r: r),
+    BVType.DATE: (
+        1082,
+        lambda v: v.isoformat(),
+        lambda r: int.to_bytes((r.toordinal() - 730120), 4, "big"),
+    ),
     BVType.DECIMAL: (1700, str),
-    BVType.FLOAT: (701, str),
-    BVType.INTEGER: (23, str),
+    BVType.FLOAT: (701, str, lambda r: struct.pack("!d", r)),
+    BVType.INTEGER: (23, str, lambda r: int.to_bytes(r, 4, "big")),
     BVType.INTEGERARRAY: (1007, lambda v: "{" + ",".join(v) + "}"),
     BVType.INTERVAL: (
         1186,
@@ -77,9 +108,17 @@ BVTYPE_TO_PGTYPE = {
     ),
     BVType.JSON: (114, lambda v: json.dumps(v)),
     BVType.STRINGARRAY: (1009, lambda v: "{" + ",".join(v) + "}"),
-    BVType.TEXT: (25, str),
-    BVType.TIME: (1083, lambda v: v.isoformat()),
-    BVType.TIMESTAMP: (1114, lambda v: v.isoformat().replace("T", " ")),
+    BVType.TEXT: (25, str, lambda r: r.encode("utf-8")),
+    BVType.TIME: (
+        1083,
+        lambda v: v.isoformat(),
+        lambda r: int.to_bytes(_time_to_microseconds(r), 8, "big"),
+    ),
+    BVType.TIMESTAMP: (
+        1114,
+        lambda v: v.isoformat().replace("T", " "),
+        lambda r: int.to_bytes(_micros_since_2000(r), 8, "big"),
+    ),
 }
 
 
@@ -164,22 +203,30 @@ class BVContext:
                 return TransactionStatus.IN_TRANSACTION
         return TransactionStatus.IDLE
 
-    def execute_sql(self, sql: str, params=None) -> QueryResult:
+    def execute_sql(self, sql: str, params=None, result_fmt=None) -> QueryResult:
         logger.info("Input SQL: " + sql)
         if self.rewriter:
             sql = self.rewriter.rewrite(sql)
             logger.info("Rewritten SQL: " + sql)
-        return self.session.execute_sql(sql, params)
+        qr = self.session.execute_sql(sql, params)
+        if qr.has_results():
+            if result_fmt and len(result_fmt) != qr.column_count():
+                qr.result_format = [result_fmt[0]] * qr.column_count()
+            else:
+                qr.result_format = result_fmt
+        return qr
 
     def describe_portal(self, name: str) -> QueryResult:
-        stmt, params = self.portals[name]
-        sql = self.stmts[stmt]
-        query_result = self.execute_sql(sql=sql, params=params)
+        stmt, params, result_fmt = self.portals[name]
+        sql, param_oids = self.stmts[stmt]
+        # todo: parse params? LIMIT 0?
+        query_result = self.execute_sql(sql=sql, params=params, result_fmt=result_fmt)
         self.result_cache[name] = query_result
         return query_result
 
     def describe_statement(self, name: str) -> QueryResult:
-        sql = self.stmts[name]
+        sql, param_oids = self.stmts[name]
+        # TODO: create default params from param_oids
         return self.execute_sql(sql)
 
     def execute_portal(self, name: str) -> QueryResult:
@@ -188,18 +235,22 @@ class BVContext:
             del self.result_cache[name]
             return query_result
         else:
-            stmt, params = self.portals[name]
-            sql = self.stmts[stmt]
-            return self.execute_sql(sql=sql, params=params)
+            stmt, params, result_fmt = self.portals[name]
+            sql, param_oids = self.stmts[stmt]
+            # parse the params?
+            qr = self.execute_sql(sql=sql, params=params, result_fmt=result_fmt)
+            return qr
 
-    def add_statement(self, name: str, sql: str):
-        self.stmts[name] = sql
+    def add_statement(self, name: str, sql: str, param_oids: List[int]):
+        self.stmts[name] = (sql, param_oids)
 
     def close_statement(self, name: str):
         del self.stmts[name]
 
-    def add_portal(self, name: str, stmt: str, params: Dict[str, str]):
-        self.portals[name] = (stmt, params)
+    def add_portal(
+        self, name: str, stmt: str, params: Dict[str, str], result_formats: List[int]
+    ):
+        self.portals[name] = (stmt, params, result_formats)
 
     def close_portal(self, name: str):
         del self.portals[name]
@@ -346,7 +397,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_ready_for_query(ctx)
             return
 
-        if query_result.has_results():
+        if not query_result:
+            raise Exception("No query result for query: " + decoded)
+        elif query_result.has_results():
             self.send_row_description(query_result)
             row_count = self.send_data_rows(query_result)
             self.send_command_complete("SELECT %d\x00" % row_count)
@@ -363,7 +416,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         query_idx = ba.index(NULL_BYTE, stmt_idx + 1)
         sql = ba[stmt_idx + 1 : query_idx].decode("utf-8")
         logger.debug("Parsed statement: %s", sql)
-        ctx.add_statement(stmt, sql)
+        buf = BVBuffer(io.BytesIO(ba[query_idx + 1 :]))
+        num_params = buf.read_int16()
+        param_oids = []
+        for i in range(num_params):
+            param_oids.append(buf.read_int32())
+        ctx.add_statement(stmt, sql, param_oids)
         self.send_parse_complete()
 
     def handle_bind(self, ctx: BVContext, payload: bytes):
@@ -401,7 +459,12 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 # ints but I can live with it for now
                 params.append(int.from_bytes(v, "big"))
         logger.debug("Bind params: %s", params)
-        ctx.add_portal(portal, stmt, params)
+        # now expected result formats
+        num_result_formats = buf.read_int16()
+        result_formats = []
+        for i in range(num_result_formats):
+            result_formats.append(buf.read_int16())
+        ctx.add_portal(portal, stmt, params, result_formats)
         self.send_bind_complete()
 
     def handle_describe(self, ctx: BVContext, payload: bytes):
@@ -468,7 +531,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             name, bvtype = query_result.column(i)
             oid = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[0]
             buf.write_string(name)
-            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, 0))
+            fmt = query_result.result_format[i] if query_result.result_format else 0
+            buf.write_bytes(struct.pack("!ihihih", 0, 0, oid, 0, -1, fmt))
         out = buf.get_value()
         sig = struct.pack(
             "!cih",
@@ -483,14 +547,20 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         converters = []
         for i in range(query_result.column_count()):
             bvtype = query_result.column(i)[1]
-            converters.append(BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)[1])
+            pgtype = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)
+            if not query_result.result_format or query_result.result_format[i] == 0:
+                txt_fn = pgtype[1]
+                c = lambda r: txt_fn(r).encode("utf-8")
+            else:
+                c = pgtype[2]
+            converters.append(c)
         for row in query_result.rows():
             buf = BVBuffer()
-            for i, r in enumerate(row):
+            for j, r in enumerate(row):
                 if r is None:
                     buf.write_int32(-1)
                 else:
-                    v = converters[i](r).encode("utf-8")
+                    v = converters[j](r)
                     buf.write_int32(len(v))
                     buf.write_bytes(v)
             out = buf.get_value()

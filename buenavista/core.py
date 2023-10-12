@@ -28,6 +28,9 @@ class BVType(enum.Enum):
 class QueryResult:
     """The BV representation of a result of a query."""
 
+    def __init__(self):
+        self.result_format = None
+
     def has_results(self) -> bool:
         raise NotImplementedError
 
@@ -113,6 +116,7 @@ class Extension:
 
 class SimpleQueryResult(QueryResult):
     def __init__(self, name: str, value: Any, type: BVType):
+        super().__init__()
         self.name = name
         self.value = str(value)
         self.type = type

@@ -28,7 +28,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "fastapi",
-        "pydantic",
+        "pydantic>=1.2.0,<2.0.0",
         "sqlglot",
     ],
     extras_require={
