@@ -397,7 +397,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             self.send_ready_for_query(ctx)
             return
 
-        if query_result.has_results():
+        if not query_result:
+            raise Exception("No query result for query: " + decoded)
+        elif query_result.has_results():
             self.send_row_description(query_result)
             row_count = self.send_data_rows(query_result)
             self.send_command_complete("SELECT %d\x00" % row_count)
