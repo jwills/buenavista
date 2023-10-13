@@ -549,18 +549,20 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             bvtype = query_result.column(i)[1]
             pgtype = BVTYPE_TO_PGTYPE.get(bvtype, PG_UNKNOWN)
             if not query_result.result_format or query_result.result_format[i] == 0:
-                txt_fn = pgtype[1]
-                c = lambda r: txt_fn(r).encode("utf-8")
+                converters.append((pgtype[1], True))
             else:
-                c = pgtype[2]
-            converters.append(c)
+                converters.append((pgtype[2], False))
         for row in query_result.rows():
             buf = BVBuffer()
-            for j, r in enumerate(row):
+            for j in range(query_result.column_count()):
+                r = row[j]
                 if r is None:
                     buf.write_int32(-1)
                 else:
-                    v = converters[j](r)
+                    converter, do_encode = converters[j]
+                    v = converter(r)
+                    if do_encode:
+                        v = v.encode("utf-8")
                     buf.write_int32(len(v))
                     buf.write_bytes(v)
             out = buf.get_value()
