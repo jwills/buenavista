@@ -27,8 +27,8 @@ setup(
     packages=find_namespace_packages(include=["buenavista", "buenavista.*"]),
     include_package_data=True,
     install_requires=[
-        "fastapi>=0.80.0,<1.0.0",
-        "pydantic>=1.2.0,<2.0.0",
+        "fastapi>=0.109.0,<1.0.0",
+        "pydantic>=2,<3",
         "sqlglot",
     ],
     extras_require={

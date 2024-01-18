@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
 
 
 def camel_case(s: str) -> str:
@@ -10,9 +10,10 @@ def camel_case(s: str) -> str:
 
 
 class CamelModel(BaseModel):
-    class Config:
-        alias_generator = camel_case
-        allow_population_by_field_name = True
+    model_config = ConfigDict(
+        alias_generator=camel_case,
+        populate_by_name=True,
+    )
 
 
 class ClientTypeSignatureParameter(CamelModel):
@@ -57,11 +58,11 @@ class StatementStats(CamelModel):
 
 
 class QueryError(CamelModel):
-    message: Optional[str]
-    sql_state: Optional[str]
+    message: Optional[str] = None
+    sql_state: Optional[str] = None
     error_code: int
-    error_name: Optional[str]
-    error_type: Optional[str]
+    error_name: Optional[str] = None
+    error_type: Optional[str] = None
     retriable: bool
     error_location: Optional[CamelModel] = None
     failure_info: Optional[CamelModel] = None
@@ -81,7 +82,7 @@ class BaseResult(CamelModel):
     id: str
     info_uri: HttpUrl
     stats: StatementStats
-    warnings: Optional[List[PrestoWarning]]
+    warnings: Optional[List[PrestoWarning]] = None
 
 
 class QueryResult(BaseResult):
