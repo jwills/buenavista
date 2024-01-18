@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
 
 
 def camel_case(s: str) -> str:
@@ -10,9 +10,10 @@ def camel_case(s: str) -> str:
 
 
 class CamelModel(BaseModel):
-    class Config:
-        alias_generator = camel_case
-        allow_population_by_field_name = True
+    model_config = ConfigDict(
+        alias_generator=camel_case
+        allow_population_by_field_name=True
+    )
 
 
 class ClientTypeSignatureParameter(CamelModel):
