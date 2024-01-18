@@ -58,11 +58,11 @@ class StatementStats(CamelModel):
 
 
 class QueryError(CamelModel):
-    message: Optional[str]
-    sql_state: Optional[str]
+    message: Optional[str] = None
+    sql_state: Optional[str] = None
     error_code: int
-    error_name: Optional[str]
-    error_type: Optional[str]
+    error_name: Optional[str] = None
+    error_type: Optional[str] = None
     retriable: bool
     error_location: Optional[CamelModel] = None
     failure_info: Optional[CamelModel] = None
@@ -82,7 +82,7 @@ class BaseResult(CamelModel):
     id: str
     info_uri: HttpUrl
     stats: StatementStats
-    warnings: Optional[List[PrestoWarning]]
+    warnings: Optional[List[PrestoWarning]] = None
 
 
 class QueryResult(BaseResult):
