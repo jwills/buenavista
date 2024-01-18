@@ -11,8 +11,8 @@ def camel_case(s: str) -> str:
 
 class CamelModel(BaseModel):
     model_config = ConfigDict(
-        alias_generator=camel_case
-        allow_population_by_field_name=True
+        alias_generator=camel_case,
+        populate_by_name=True,
     )
 
 
