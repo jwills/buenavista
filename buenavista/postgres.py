@@ -38,6 +38,35 @@ class ServerResponse:
     READY_FOR_QUERY = b"Z"
     ROW_DESCRIPTION = b"T"
 
+TYPE_OIDS = {
+    # see Postgres pg_type_d.h
+    20: ("INT8OID",   "!q"),
+    21: ("INT2OID",   "!h"),
+    23: ("INT4OID",   "!i"),
+    700:("FLOAT4OID", "!f"),
+    701:("FLOAT8OID", "!d")
+    #...
+
+    # BOOLOID 16
+    # BYTEAOID 17
+    # CHAROID 18
+    # NAMEOID 19
+    # TEXTOID 25
+    # OIDOID 26
+    # UNKNOWNOID 705
+    # MONEYOID 790
+    # INETOID 869
+    # VARCHAROID 1043
+    # DATEOID 1082
+    # TIMEOID 1083
+    # TIMESTAMPOID 1114
+    # TIMESTAMPTZOID 1184
+    # INTERVALOID 1186
+    # TIMETZOID 1266
+    # BITOID 1560
+    # VARBITOID 1562
+    # NUMERICOID 1700
+    }
 
 class TransactionStatus:
     IDLE = b"I"
@@ -451,6 +480,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         for i in range(num_params):
             nb = buf.read_int32()
             v = buf.read_bytes(nb)
+            typeoid = ctx.stmts[stmt][1][i]
+            logger.debug("Format: %d, Type: %d", formats[i], typeoid)
             if formats[i] == 0:
                 decoded = v.decode("utf-8")
                 if decoded.startswith("{") and decoded.endswith("}"):
@@ -458,9 +489,13 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
                 else:
                     params.append(decoded)
             else:
-                # TODO: I shouldn't be always assuming these are always
-                # ints but I can live with it for now
-                params.append(int.from_bytes(v, "big"))
+                # see Postgres pg_type_d.h for type OIDs
+                type = TYPE_OIDS.get(typeoid)
+                if type:
+                    params.append(struct.unpack(type[1], v)[0])
+                else:
+                    raise Exception(f"Unsupported binary parameter type: {typeoid}")
+
         logger.debug("Bind params: %s", params)
         # now expected result formats
         num_result_formats = buf.read_int16()
