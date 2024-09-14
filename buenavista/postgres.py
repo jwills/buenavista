@@ -1,4 +1,5 @@
 import datetime
+import dateutil.parser
 import hashlib
 import io
 import json
@@ -484,10 +485,14 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             logger.debug("Format: %d, Type: %d", formats[i], typeoid)
             if formats[i] == 0:
                 decoded = v.decode("utf-8")
-                if decoded.startswith("{") and decoded.endswith("}"):
-                    params.append(decoded[1:-1].split(","))
+                if typeoid == 0:
+                    # strangely this is set to 0 for dates and times
+                    params.append(dateutil.parser.parse(decoded))
                 else:
-                    params.append(decoded)
+                    if decoded.startswith("{") and decoded.endswith("}"):
+                        params.append(decoded[1:-1].split(","))
+                    else:
+                        params.append(decoded)
             else:
                 # see Postgres pg_type_d.h for type OIDs
                 type = TYPE_OIDS.get(typeoid)
