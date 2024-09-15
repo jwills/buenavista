@@ -41,11 +41,12 @@ class ServerResponse:
 
 TYPE_OIDS = {
     # see Postgres pg_type_d.h
-    20: ("INT8OID",   "!q"),
-    21: ("INT2OID",   "!h"),
-    23: ("INT4OID",   "!i"),
-    700:("FLOAT4OID", "!f"),
-    701:("FLOAT8OID", "!d")
+    0:  ("date/time", None, datetime.datetime(1900, 1, 1)),
+    20: ("INT8OID",   "!q", 42),
+    21: ("INT2OID",   "!h", 42),
+    23: ("INT4OID",   "!i", 42),
+    700:("FLOAT4OID", "!f", 42.0),
+    701:("FLOAT8OID", "!d", 42.0)
     #...
 
     # BOOLOID 16
@@ -257,8 +258,14 @@ class BVContext:
 
     def describe_statement(self, name: str) -> QueryResult:
         sql, param_oids = self.stmts[name]
-        # TODO: create default params from param_oids
-        return self.execute_sql(sql)
+        params = []
+        for typeoid in param_oids:
+            type = TYPE_OIDS.get(typeoid)
+            if type:
+                params.append(type[2])
+            else:
+                raise Exception(f"Unsupported parameter type: {typeoid}")
+        return self.execute_sql(sql, params)
 
     def execute_portal(self, name: str) -> QueryResult:
         if name in self.result_cache:
