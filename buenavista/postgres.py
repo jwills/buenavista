@@ -530,7 +530,6 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()
-        self.send_ready_for_query(ctx)
 
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
