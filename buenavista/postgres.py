@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import socket
 import socketserver
 import struct
 from typing import Dict, List, Optional
@@ -265,6 +266,8 @@ class BVContext:
 
 class BuenaVistaHandler(socketserver.StreamRequestHandler):
     def handle(self):
+        # disable Nangle's
+        self.request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         self.r = BVBuffer(self.rfile)
         ctx = None
         try:
