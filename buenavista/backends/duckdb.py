@@ -177,6 +177,10 @@ class DuckDBSession(Session):
             return sql.replace("pg_catalog.current_schemas", "current_schemas")
         elif "pg_catalog.generate_series" in sql:
             return sql.replace("pg_catalog.generate_series", "generate_series")
+        elif "pg_catalog.PG_GET_USERBYID" in sql:
+            # allow psql's \d to work
+            # just display the owner's oid
+            return sql.replace("pg_catalog.PG_GET_USERBYID", "")
         return sql
 
     def in_transaction(self) -> bool:
