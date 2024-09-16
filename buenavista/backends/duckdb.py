@@ -53,21 +53,17 @@ def to_bvtype(t: pa.DataType) -> BVType:
 class RecordBatchIterator(Iterator[List[Optional[str]]]):
     def __init__(self, rbr: pa.RecordBatchReader):
         self.rbr = rbr
-
-    def __iter__(self):
-        try:
-            self.rb = self.rbr.read_next_batch()
-        except StopIteration:
-            self.rb = None
+        self.rb = None
         self.i = 0
-        return self
 
     def __next__(self) -> List:
-        if self.rb is None:
-            raise StopIteration
-        if self.i >= self.rb.num_rows:
-            self.rb = self.rbr.read_next_batch()
-            self.i = 0
+        if self.rb is None or self.i >= self.rb.num_rows:
+            try:
+                self.rb = self.rbr.read_next_batch()
+                self.i = 0
+            except StopIteration:
+                raise StopIteration
+
         ret = []
         for col in self.rb.columns:
             ret.append(col[self.i].as_py())
@@ -82,8 +78,10 @@ class DuckDBQueryResult(QueryResult):
         super().__init__()
         if rbr:
             self.rbr = rbr
+            self.rbi = RecordBatchIterator(self.rbr)
             self.bvtypes = [to_bvtype(s.type) for s in rbr.schema]
         else:
+            self.rbi = None
             self.rbr = None
             self.bvtypes = []
         self._status = status
@@ -105,8 +103,8 @@ class DuckDBQueryResult(QueryResult):
             raise IndexError("No column at index %d" % index)
 
     def rows(self) -> Iterator[List]:
-        if self.rbr:
-            return RecordBatchIterator(self.rbr)
+        if self.rbi:
+            return self.rbi
         else:
             return iter([])
 

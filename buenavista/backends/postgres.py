@@ -36,7 +36,7 @@ class PGQueryResult(QueryResult):
     ):
         super().__init__()
         self.fields = fields
-        self._rows = rows
+        self._iter = iter(rows)
         self._status = status
 
     def has_results(self) -> bool:
@@ -49,7 +49,7 @@ class PGQueryResult(QueryResult):
         return self.fields[index]
 
     def rows(self) -> Iterator[List]:
-        return iter(self._rows)
+        return self._iter
 
     def status(self):
         return self._status

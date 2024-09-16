@@ -508,7 +508,14 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             return
         if query_result.has_results():
             row_count = self.send_data_rows(query_result, limit)
-            self.send_command_complete("SELECT %d\x00" % row_count)
+            if limit == 0 or row_count < limit:
+                self.send_command_complete("SELECT %d\x00" % row_count)
+            else:
+                # add result back to the cache, so they'll
+                # be picked up on text call
+                ctx.result_cache[portal] = query_result
+                self.send_portal_suspend()
+
         else:
             status = query_result.status()
             self.send_command_complete(f"{status}\x00")
@@ -523,7 +530,6 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()
-        self.send_ready_for_query(ctx)
 
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
@@ -627,6 +633,9 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
 
     def send_close_complete(self):
         self.wfile.write(struct.pack("!ci", ServerResponse.CLOSE_COMPLETE, 4))
+
+    def send_portal_suspend(self):
+        self.wfile.write(struct.pack("!ci", ServerResponse.PORTAL_SUSPENDED, 4))
 
     def send_command_complete(self, tag: str):
         buf = BVBuffer()
