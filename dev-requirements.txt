@@ -1,3 +1,4 @@
+dateutil
 duckdb
 fastapi[all]
 psycopg
