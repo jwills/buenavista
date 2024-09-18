@@ -536,6 +536,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             except Exception as e:
                 self.send_error(e, ctx)
                 return
+            param_oids = ctx.stmts[stmt][1]
+            self.send_paramter_description(param_oids)
         else:
             raise Exception(f"Unknown describe type: {describe_type}")
         if query_result.has_results():
@@ -580,6 +582,19 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()
+
+    def send_paramter_description(self, param_oids: List[int]):
+        buf = BVBuffer()
+        for oid in param_oids:
+            buf.write_int32(oid)
+        out = buf.get_value()
+        sig = struct.pack(
+            "!cih",
+            ServerResponse.PARAMETER_DESCRIPTION,
+            len(out) + 6,
+            len(param_oids),
+        )
+        self.wfile.write(sig + out)
 
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
