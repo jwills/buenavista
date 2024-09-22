@@ -1,4 +1,5 @@
 import datetime
+import dateutil.parser
 import hashlib
 import io
 import json
@@ -38,6 +39,36 @@ class ServerResponse:
     READY_FOR_QUERY = b"Z"
     ROW_DESCRIPTION = b"T"
 
+TYPE_OIDS = {
+    # see Postgres pg_type_d.h
+    0:  ("date/time", None, datetime.datetime(1900, 1, 1)),
+    20: ("INT8OID",   "!q", 42),
+    21: ("INT2OID",   "!h", 42),
+    23: ("INT4OID",   "!i", 42),
+    700:("FLOAT4OID", "!f", 42.0),
+    701:("FLOAT8OID", "!d", 42.0)
+    #...
+
+    # BOOLOID 16
+    # BYTEAOID 17
+    # CHAROID 18
+    # NAMEOID 19
+    # TEXTOID 25
+    # OIDOID 26
+    # UNKNOWNOID 705
+    # MONEYOID 790
+    # INETOID 869
+    # VARCHAROID 1043
+    # DATEOID 1082
+    # TIMEOID 1083
+    # TIMESTAMPOID 1114
+    # TIMESTAMPTZOID 1184
+    # INTERVALOID 1186
+    # TIMETZOID 1266
+    # BITOID 1560
+    # VARBITOID 1562
+    # NUMERICOID 1700
+    }
 
 class TransactionStatus:
     IDLE = b"I"
@@ -227,8 +258,14 @@ class BVContext:
 
     def describe_statement(self, name: str) -> QueryResult:
         sql, param_oids = self.stmts[name]
-        # TODO: create default params from param_oids
-        return self.execute_sql(sql)
+        params = []
+        for typeoid in param_oids:
+            type = TYPE_OIDS.get(typeoid)
+            if type:
+                params.append(type[2])
+            else:
+                raise Exception(f"Unsupported parameter type: {typeoid}")
+        return self.execute_sql(sql, params)
 
     def execute_portal(self, name: str) -> QueryResult:
         if name in self.result_cache:
@@ -451,16 +488,26 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         for i in range(num_params):
             nb = buf.read_int32()
             v = buf.read_bytes(nb)
+            typeoid = ctx.stmts[stmt][1][i]
+            logger.debug("Format: %d, Type: %d", formats[i], typeoid)
             if formats[i] == 0:
                 decoded = v.decode("utf-8")
-                if decoded.startswith("{") and decoded.endswith("}"):
-                    params.append(decoded[1:-1].split(","))
+                if typeoid == 0:
+                    # strangely this is set to 0 for dates and times
+                    params.append(dateutil.parser.parse(decoded))
                 else:
-                    params.append(decoded)
+                    if decoded.startswith("{") and decoded.endswith("}"):
+                        params.append(decoded[1:-1].split(","))
+                    else:
+                        params.append(decoded)
             else:
-                # TODO: I shouldn't be always assuming these are always
-                # ints but I can live with it for now
-                params.append(int.from_bytes(v, "big"))
+                # see Postgres pg_type_d.h for type OIDs
+                type = TYPE_OIDS.get(typeoid)
+                if type:
+                    params.append(struct.unpack(type[1], v)[0])
+                else:
+                    raise Exception(f"Unsupported binary parameter type: {typeoid}")
+
         logger.debug("Bind params: %s", params)
         # now expected result formats
         num_result_formats = buf.read_int16()
@@ -489,6 +536,8 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
             except Exception as e:
                 self.send_error(e, ctx)
                 return
+            param_oids = ctx.stmts[stmt][1]
+            self.send_paramter_description(param_oids)
         else:
             raise Exception(f"Unknown describe type: {describe_type}")
         if query_result.has_results():
@@ -533,6 +582,19 @@ class BuenaVistaHandler(socketserver.StreamRequestHandler):
         else:
             raise Exception(f"Unknown close type: {close_type}")
         self.send_close_complete()
+
+    def send_paramter_description(self, param_oids: List[int]):
+        buf = BVBuffer()
+        for oid in param_oids:
+            buf.write_int32(oid)
+        out = buf.get_value()
+        sig = struct.pack(
+            "!cih",
+            ServerResponse.PARAMETER_DESCRIPTION,
+            len(out) + 6,
+            len(param_oids),
+        )
+        self.wfile.write(sig + out)
 
     def send_row_description(self, query_result: QueryResult):
         buf = BVBuffer()
