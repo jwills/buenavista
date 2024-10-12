@@ -10,7 +10,7 @@ with open(os.path.join(this_directory, "README.md")) as f:
     long_description = f.read()
 
 package_name = "buenavista"
-package_version = "0.4.0"
+package_version = "0.5.0"
 
 description = """Programmable Presto and Postgres Proxies"""
 

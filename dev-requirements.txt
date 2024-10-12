@@ -3,7 +3,7 @@ fastapi[all]
 psycopg
 psycopg-pool
 pyarrow
-pydantic>=1.2.0,<2.0.0
+pydantic>=2,<3
 pytest
 python-dateutil
 sqlglot
